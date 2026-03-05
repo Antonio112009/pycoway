@@ -3,14 +3,17 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cowayaio"
+name = "pycoway"
 dynamic = ["version"]
 description = "An asynchronous Python library for Coway IoCare Air Purifiers"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
 authors = [
-    { name = "Robert Drinovac", email = "unlisted@gmail.com" },
+    { name = "Antonio112009" },
+]
+maintainers = [
+    { name = "Antonio112009" },
 ]
 keywords = ["coway", "iocare", "iocare api", "coway api", "airmega"]
 classifiers = [
