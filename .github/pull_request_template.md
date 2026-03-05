@@ -1,14 +1,8 @@
-## Summary
+## What changed and why?
 
-Describe the change briefly.
-
-## Target branch
-
-Normal contributions should target `development`.
-Only release PRs should target `main` from `development`.
 
 ## Checklist
 
-- [ ] Base branch is `development` unless this is a release PR
-- [ ] Tests pass locally (`pytest`)
-- [ ] Lint passes locally (`ruff check .` and `ruff format --check .`)
+- [ ] `pytest` passes
+- [ ] `ruff check .` and `ruff format --check .` pass
+- [ ] Base branch is `development` (release PRs: `development` → `main`)
