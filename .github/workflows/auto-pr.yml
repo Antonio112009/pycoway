@@ -40,12 +40,13 @@ jobs:
             echo '## Changes since last release'
             echo ''
 
-            # List merged PRs into development since main
+            # List merged PRs into development since main (exclude merge-loop artifacts)
             echo '### Merged pull requests'
             gh pr list --base development --state merged \
               --json number,title,mergedAt,author \
-              --jq 'sort_by(.mergedAt) | reverse | .[] |
-                "- #\(.number) \(.title) (@\(.author.login))"' \
+              --jq '[sort_by(.mergedAt) | reverse | .[] |
+                select(.title | test("^Merge (pull request|development)") | not)] |
+                .[] | "- #\(.number) \(.title) (@\(.author.login))"' \
             | head -50
 
             echo ''
