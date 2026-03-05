@@ -39,9 +39,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/antonio112009/cowayaio"
-"Bug Reports" = "https://github.com/antonio112009/cowayaio/issues"
-Source = "https://github.com/antonio112009/cowayaio/"
+Homepage = "https://github.com/antonio112009/pycoway"
+"Bug Reports" = "https://github.com/antonio112009/pycoway/issues"
+Source = "https://github.com/antonio112009/pycoway/"
 Upstream = "https://github.com/RobertD502/cowayaio"
 
 [tool.setuptools.dynamic]
