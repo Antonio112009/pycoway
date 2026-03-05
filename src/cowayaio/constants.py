@@ -1,6 +1,6 @@
 """Constants for CowayAIO"""
 
-from .str_enum import StrEnum
+from .enums import StrEnum
 from .__version__ import __version__ as version
 
 
@@ -63,4 +63,3 @@ PREFILTER_CYCLE = {
     4: '224'
 }
 TIMEOUT = 5 * 60
-

@@ -15,8 +15,8 @@ from cowayaio.constants import (
     Parameter,
     TIMEOUT,
 )
+from cowayaio.account.auth import CowayAuthClient
 from cowayaio.exceptions import CowayError
-from cowayaio.auth import CowayAuthClient
 
 
 LOGGER = logging.getLogger(__name__)

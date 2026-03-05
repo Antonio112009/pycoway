@@ -7,7 +7,7 @@ import pytest
 
 from cowayaio.constants import ErrorMessages
 from cowayaio.exceptions import AuthError, CowayError, ServerMaintenance
-from cowayaio.http import CowayHttpClient
+from cowayaio.transport.http import CowayHttpClient
 
 
 def _mock_response(

@@ -1,6 +1,6 @@
-"""Tests for purifier_model dataclasses."""
+"""Tests for device models dataclasses."""
 
-from cowayaio.purifier_model import CowayPurifier, DeviceAttributes, PurifierData
+from cowayaio.devices.models import CowayPurifier, DeviceAttributes, PurifierData
 
 
 class TestDeviceAttributes:

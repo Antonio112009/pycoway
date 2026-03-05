@@ -6,8 +6,8 @@ import logging
 
 from bs4 import BeautifulSoup
 
+from cowayaio.devices.models import CowayPurifier, DeviceAttributes
 from cowayaio.exceptions import CowayError
-from cowayaio.purifier_model import CowayPurifier, DeviceAttributes
 
 
 LOGGER = logging.getLogger(__name__)

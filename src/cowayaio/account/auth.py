@@ -24,7 +24,7 @@ from cowayaio.exceptions import (
     RateLimited,
     ServerMaintenance,
 )
-from cowayaio.http import CowayHttpClient
+from cowayaio.transport.http import CowayHttpClient
 
 
 LOGGER = logging.getLogger(__name__)

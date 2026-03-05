@@ -1,11 +1,11 @@
-"""Tests for purifier_parser module."""
+"""Tests for parser module."""
 
 import json
 
 import pytest
 
 from cowayaio.exceptions import CowayError
-from cowayaio.purifier_parser import (
+from cowayaio.devices.parser import (
     build_filter_dict,
     build_purifier,
     extract_parsed_info,

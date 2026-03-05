@@ -1,6 +1,6 @@
 """Init file for CowayAIO"""
 
-from .coway_client import CowayClient
+from .client import CowayClient
 from .exceptions import (
     AuthError,
     CowayError,
@@ -11,7 +11,7 @@ from .exceptions import (
     ServerMaintenance,
 )
 from .constants import LightMode
-from .purifier_model import CowayPurifier, DeviceAttributes, PurifierData
+from .devices.models import CowayPurifier, DeviceAttributes, PurifierData
 from .__version__ import __version__
 
 __all__ = [

@@ -10,8 +10,8 @@ from cowayaio.constants import (
     PREFILTER_CYCLE,
 )
 from cowayaio.exceptions import CowayError
-from cowayaio.data import CowayDataClient
-from cowayaio.purifier_model import DeviceAttributes
+from cowayaio.devices.data import CowayDataClient
+from cowayaio.devices.models import DeviceAttributes
 
 
 LOGGER = logging.getLogger(__name__)

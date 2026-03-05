@@ -10,18 +10,18 @@ from cowayaio.constants import (
     Header,
     Parameter,
 )
-from cowayaio.exceptions import (
-    AuthError,
-    CowayError,
-    NoPurifiers,
-)
-from cowayaio.maintenance import CowayMaintenanceClient
-from cowayaio.purifier_model import PurifierData, CowayPurifier
-from cowayaio.purifier_parser import (
+from cowayaio.account.maintenance import CowayMaintenanceClient
+from cowayaio.devices.models import PurifierData, CowayPurifier
+from cowayaio.devices.parser import (
     build_filter_dict,
     build_purifier,
     extract_parsed_info,
     parse_purifier_html,
+)
+from cowayaio.exceptions import (
+    AuthError,
+    CowayError,
+    NoPurifiers,
 )
 
 
