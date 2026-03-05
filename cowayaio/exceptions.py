@@ -1,59 +1,29 @@
 """Exceptions for Coway IoCare."""
 
-from typing import Any
-
 
 class CowayError(Exception):
     """Error from Coway api."""
 
-    def __init__(self, *args: Any) -> None:
-        """Initialize the exception."""
-        Exception.__init__(self, *args)
 
-
-class AuthError(Exception):
+class AuthError(CowayError):
     """Authentication issue from Coway api."""
 
-    def __init__(self, *args: Any) -> None:
-        """Initialize the exception."""
-        Exception.__init__(self, *args)
 
-
-class PasswordExpired(Exception):
+class PasswordExpired(CowayError):
     """Coway API indicating password has expired."""
 
-    def __init__(self, *args: Any) -> None:
-        """Initialize the exception."""
-        Exception.__init__(self, *args) 
+
+class ServerMaintenance(CowayError):
+    """Coway API indicating servers are undergoing maintenance."""
 
 
-class ServerMaintenance(Exception):
-    """Coway API indicating servers are undergoing maintenance"""
-
-    def __init__(self, *args: Any) -> None:
-        """Initialize the exception."""
-        Exception.__init__(self, *args)
+class RateLimited(CowayError):
+    """Coway API indicating account has been rate-limited."""
 
 
-class RateLimited(Exception):
-    """Coway API indicating account has been rate-limited"""
-
-    def __init__(self, *args: Any) -> None:
-        """Initialize the exception."""
-        Exception.__init__(self, *args)
+class NoPlaces(CowayError):
+    """Coway API indicating account has no places defined."""
 
 
-class NoPlaces(Exception):
-    """Coway API indicating account has no places defined"""
-
-    def __init__(self, *args: Any) -> None:
-        """Initialize the exception."""
-        Exception.__init__(self, *args)
-
-
-class NoPurifiers(Exception):
-    """Coway API indicating account has no purifiers on account"""
-
-    def __init__(self, *args: Any) -> None:
-        """Initialize the exception."""
-        Exception.__init__(self, *args)
+class NoPurifiers(CowayError):
+    """Coway API indicating account has no purifiers."""

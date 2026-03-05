@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cowayaio"
+dynamic = ["version"]
+description = "An asynchronous Python library for Coway IoCare Air Purifiers"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    { name = "Robert Drinovac", email = "unlisted@gmail.com" },
+]
+keywords = ["coway", "iocare", "iocare api", "coway api", "airmega"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "aiohttp>=3.9.0",
+    "beautifulsoup4>=4.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "aioresponses>=0.7",
+    "ruff",
+]
+
+[project.urls]
+Homepage = "https://github.com/antonio112009/cowayaio"
+"Bug Reports" = "https://github.com/antonio112009/cowayaio/issues"
+Source = "https://github.com/antonio112009/cowayaio/"
+Upstream = "https://github.com/RobertD502/cowayaio"
+
+[tool.setuptools.dynamic]
+version = { attr = "cowayaio.__version__.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["cowayaio*"]
+
+[tool.setuptools.package-data]
+cowayaio = ["py.typed"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

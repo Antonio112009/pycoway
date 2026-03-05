@@ -1,8 +1,20 @@
 """Data classes for Coway IoCare Purifiers."""
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+
+
+@dataclass
+class DeviceAttributes:
+    """Device identification attributes for a Coway purifier."""
+
+    device_id: str | None
+    model: str | None
+    model_code: str | None
+    code: str | None
+    name: str | None
+    product_name: str | None
+    place_id: str | None
 
 
 @dataclass
@@ -16,7 +28,7 @@ class PurifierData:
 class CowayPurifier:
     """Dataclass for Coway IoCare Purifier"""
 
-    device_attr: dict[str, Any]
+    device_attr: DeviceAttributes
     mcu_version: str | None
     network_status: bool | None
     is_on: bool | None
