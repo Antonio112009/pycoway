@@ -4,24 +4,20 @@ import json
 
 import pytest
 
-from cowayaio.exceptions import CowayError
 from cowayaio.devices.parser import (
     build_filter_dict,
     build_purifier,
     extract_parsed_info,
     parse_purifier_html,
 )
+from cowayaio.exceptions import CowayError
 
 
 class TestParseHtml:
     def _wrap_html(self, json_data: dict) -> str:
         """Wrap JSON in a minimal HTML page with the expected script tag."""
         raw = json.dumps(json_data)
-        return (
-            "<html><body>"
-            f"<script>var sensorInfo = {raw};</script>"
-            "</body></html>"
-        )
+        return f"<html><body><script>var sensorInfo = {raw};</script></body></html>"
 
     def test_returns_first_dict_child(self, sample_purifier_json_children):
         html = self._wrap_html(sample_purifier_json_children)

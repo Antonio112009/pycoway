@@ -1,6 +1,5 @@
 """Tests for HTTP response handling."""
 
-import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -40,18 +39,12 @@ class TestResponse:
             await CowayHttpClient._response(resp)
 
     async def test_error_key_invalid_refresh(self):
-        resp = _mock_response(
-            json_data={
-                "error": {"message": ErrorMessages.INVALID_REFRESH_TOKEN}
-            }
-        )
+        resp = _mock_response(json_data={"error": {"message": ErrorMessages.INVALID_REFRESH_TOKEN}})
         with pytest.raises(AuthError):
             await CowayHttpClient._response(resp)
 
     async def test_error_key_generic(self):
-        resp = _mock_response(
-            json_data={"error": {"message": "some error"}}
-        )
+        resp = _mock_response(json_data={"error": {"message": "some error"}})
         with pytest.raises(CowayError, match="some error"):
             await CowayHttpClient._response(resp)
 

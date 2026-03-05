@@ -1,10 +1,9 @@
 """Shared test fixtures for cowayaio tests."""
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
-
 
 # Keep direct test runs working with the src/ layout.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -72,11 +71,7 @@ def sample_purifier_json_children() -> dict:
                     {"data": {"sensorInfo": {"attributes": {"0001": 15}}}},
                 ],
                 "deviceStatusData": {
-                    "data": {
-                        "statusInfo": {
-                            "attributes": {"0001": 1, "0002": 1, "0003": 2}
-                        }
-                    }
+                    "data": {"statusInfo": {"attributes": {"0001": 1, "0002": 1, "0003": 2}}}
                 },
                 "baseInfoForModelCodeData": {
                     "deviceInfo": {
