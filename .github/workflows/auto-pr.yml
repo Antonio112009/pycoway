@@ -7,6 +7,8 @@ on:
 jobs:
   create-pr:
     runs-on: ubuntu-latest
+    # Skip if the push is a merge commit from main (prevents loop)
+    if: ${{ !contains(github.event.head_commit.message, 'Merge pull request') || !contains(github.event.head_commit.message, 'from Antonio112009/main') }}
     permissions:
       contents: write
       pull-requests: write
@@ -15,19 +17,65 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create or update PR development → main
+      - name: Check for meaningful diff
+        id: diff
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Only create PR if development is actually ahead of main
+          if git diff origin/main...origin/development --quiet; then
+            echo "has_diff=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_diff=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build changelog
+        if: steps.diff.outputs.has_diff == 'true'
+        id: changelog
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo 'body<<CHANGELOG_EOF'
+            echo '## Changes since last release'
+            echo ''
+
+            # List merged PRs into development since main (exclude merge-loop artifacts)
+            echo '### Merged pull requests'
+            gh pr list --base development --state merged \
+              --json number,title,mergedAt,author \
+              --jq '[sort_by(.mergedAt) | reverse | .[] |
+                select(.title | test("^Merge (pull request|development)") | not)] |
+                .[] | "- #\(.number) \(.title) (@\(.author.login))"' \
+            | head -50
+
+            echo ''
+            echo '### Commits'
+            git log origin/main..origin/development --oneline --no-merges \
+            | head -50
+
+            echo ''
+            echo '---'
+            echo '*Auto-generated from `development` branch.*'
+            echo 'CHANGELOG_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or update PR development → main
+        if: steps.diff.outputs.has_diff == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_BODY: ${{ steps.changelog.outputs.body }}
         run: |
           # Check if an open PR from development → main already exists
           existing_pr=$(gh pr list --base main --head development --state open --json number --jq '.[0].number')
 
           if [ -n "$existing_pr" ]; then
-            echo "PR #$existing_pr already exists, it will auto-update with new commits."
+            echo "Updating PR #$existing_pr body with latest changelog."
+            gh pr edit "$existing_pr" --body "$PR_BODY"
           else
             gh pr create \
               --base main \
               --head development \
               --title "Merge development into main" \
-              --body "Automated PR to promote changes from \`development\` to \`main\`."
+              --body "$PR_BODY"
           fi
