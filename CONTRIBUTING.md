@@ -1,4 +1,4 @@
-# Contributing to cowayaio
+# Contributing to pycoway
 
 Thank you for your interest in contributing! This document explains the workflow and guidelines.
 
@@ -68,7 +68,7 @@ ruff format --check .
 ## Project Structure
 
 ```
-src/cowayaio/
+src/pycoway/
 ├── client.py              # Public CowayClient entry point
 ├── constants.py           # Enums for endpoints, parameters, headers
 ├── exceptions.py          # Exception hierarchy

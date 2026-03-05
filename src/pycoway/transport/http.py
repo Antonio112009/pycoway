@@ -6,14 +6,14 @@ from typing import Any
 
 from aiohttp import ClientResponse, ClientSession, ClientTimeout, ContentTypeError
 
-from cowayaio.constants import (
+from pycoway.constants import (
     TIMEOUT,
     Endpoint,
     ErrorMessages,
     Header,
     Parameter,
 )
-from cowayaio.exceptions import (
+from pycoway.exceptions import (
     AuthError,
     CowayError,
     ServerMaintenance,

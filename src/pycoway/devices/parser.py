@@ -6,8 +6,8 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
-from cowayaio.devices.models import CowayPurifier, DeviceAttributes
-from cowayaio.exceptions import CowayError
+from pycoway.devices.models import CowayPurifier, DeviceAttributes
+from pycoway.exceptions import CowayError
 
 LOGGER = logging.getLogger(__name__)
 

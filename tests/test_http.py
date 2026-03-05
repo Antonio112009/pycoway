@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from cowayaio.constants import ErrorMessages
-from cowayaio.exceptions import AuthError, CowayError, ServerMaintenance
-from cowayaio.transport.http import CowayHttpClient
+from pycoway.constants import ErrorMessages
+from pycoway.exceptions import AuthError, CowayError, ServerMaintenance
+from pycoway.transport.http import CowayHttpClient
 
 
 def _mock_response(

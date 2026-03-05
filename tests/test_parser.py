@@ -4,13 +4,13 @@ import json
 
 import pytest
 
-from cowayaio.devices.parser import (
+from pycoway.devices.parser import (
     build_filter_dict,
     build_purifier,
     extract_parsed_info,
     parse_purifier_html,
 )
-from cowayaio.exceptions import CowayError
+from pycoway.exceptions import CowayError
 
 
 class TestParseHtml:

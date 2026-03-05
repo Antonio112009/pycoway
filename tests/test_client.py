@@ -2,8 +2,8 @@
 
 from unittest.mock import AsyncMock
 
-from cowayaio.account.auth import CowayAuthClient
-from cowayaio.client import CowayClient
+from pycoway.account.auth import CowayAuthClient
+from pycoway.client import CowayClient
 
 
 class _MockPostContext:

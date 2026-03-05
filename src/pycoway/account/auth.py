@@ -9,14 +9,14 @@ from typing import Any
 from aiohttp import ClientResponse, ClientSession
 from bs4 import BeautifulSoup
 
-from cowayaio.constants import (
+from pycoway.constants import (
     TIMEOUT,
     Endpoint,
     ErrorMessages,
     Header,
     Parameter,
 )
-from cowayaio.exceptions import (
+from pycoway.exceptions import (
     AuthError,
     CowayError,
     NoPlaces,
@@ -24,7 +24,7 @@ from cowayaio.exceptions import (
     RateLimited,
     ServerMaintenance,
 )
-from cowayaio.transport.http import CowayHttpClient
+from pycoway.transport.http import CowayHttpClient
 
 LOGGER = logging.getLogger(__name__)
 

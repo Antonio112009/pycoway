@@ -4,14 +4,14 @@ import json
 import logging
 from typing import Any
 
-from cowayaio.constants import (
+from pycoway.constants import (
     PREFILTER_CYCLE,
     Endpoint,
     LightMode,
 )
-from cowayaio.devices.data import CowayDataClient
-from cowayaio.devices.models import DeviceAttributes
-from cowayaio.exceptions import CowayError
+from pycoway.devices.data import CowayDataClient
+from pycoway.devices.models import DeviceAttributes
+from pycoway.exceptions import CowayError
 
 LOGGER = logging.getLogger(__name__)
 

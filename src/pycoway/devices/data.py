@@ -4,20 +4,20 @@ import json
 import logging
 from typing import Any
 
-from cowayaio.account.maintenance import CowayMaintenanceClient
-from cowayaio.constants import (
+from pycoway.account.maintenance import CowayMaintenanceClient
+from pycoway.constants import (
     CATEGORY_NAME,
     Endpoint,
     Header,
 )
-from cowayaio.devices.models import CowayPurifier, PurifierData
-from cowayaio.devices.parser import (
+from pycoway.devices.models import CowayPurifier, PurifierData
+from pycoway.devices.parser import (
     build_filter_dict,
     build_purifier,
     extract_parsed_info,
     parse_purifier_html,
 )
-from cowayaio.exceptions import (
+from pycoway.exceptions import (
     AuthError,
     CowayError,
     NoPurifiers,
