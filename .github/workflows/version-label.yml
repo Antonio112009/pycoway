@@ -5,6 +5,10 @@ on:
     types: [opened, synchronize, labeled, unlabeled]
     branches: [main]
 
+concurrency:
+  group: version-label-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   source-branch:
     runs-on: ubuntu-latest

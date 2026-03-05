@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [main, development]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     runs-on: ubuntu-latest

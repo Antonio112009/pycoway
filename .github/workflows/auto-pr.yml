@@ -4,6 +4,10 @@ on:
   push:
     branches: [development]
 
+concurrency:
+  group: auto-pr
+  cancel-in-progress: true
+
 jobs:
   create-pr:
     runs-on: ubuntu-latest
