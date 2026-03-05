@@ -1,6 +1,6 @@
 """Python API for Coway IoCare Purifiers."""
 
-from cowayaio.devices.control import CowayControlClient
+from pycoway.devices.control import CowayControlClient
 
 
 class CowayClient(CowayControlClient):

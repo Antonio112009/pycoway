@@ -8,9 +8,7 @@
 
 `pycoway` is an asynchronous Python client for the [Coway IoCare](https://iocare.com/) API. It is designed for AIRMEGA air purifiers and exposes both state retrieval and device control through a typed, `asyncio`-friendly interface.
 
-Based on [RobertD502/cowayaio](https://github.com/RobertD502/cowayaio) with active maintenance, typed models, tests, CI, and automated releases.
-
-> **Note:** The PyPI package is `pycoway`, but the import name remains `cowayaio` for backward compatibility.
+> Based on [RobertD502/cowayaio](https://github.com/RobertD502/cowayaio) with active maintenance, typed models, tests, CI, and automated releases.
 
 ## Features
 
@@ -47,7 +45,7 @@ pip install -e ".[dev]"
 ```python
 import asyncio
 
-from cowayaio import CowayClient
+from pycoway import CowayClient
 
 
 async def main() -> None:
@@ -73,7 +71,7 @@ Every control method accepts the `device_attr` from a `CowayPurifier` instance:
 ```python
 import asyncio
 
-from cowayaio import CowayClient, LightMode
+from pycoway import CowayClient, LightMode
 
 
 async def control_first_purifier() -> None:
@@ -165,14 +163,14 @@ Each `CowayPurifier` includes:
 | `max2_pct` | `int \| None` | MAX2 filter remaining (%) |
 | `odor_filter_pct` | `int \| None` | Odor filter remaining (%) |
 
-For the complete schema, see [`src/cowayaio/devices/models.py`](src/cowayaio/devices/models.py).
+For the complete schema, see [`src/pycoway/devices/models.py`](src/pycoway/devices/models.py).
 
 ## Exceptions
 
 All exceptions inherit from `CowayError`:
 
 ```python
-from cowayaio import AuthError, CowayError, PasswordExpired
+from pycoway import AuthError, CowayError, PasswordExpired
 ```
 
 | Exception | Description |
@@ -194,10 +192,14 @@ pip uninstall cowayaio
 pip install pycoway
 ```
 
-No code changes needed — the import name stays `cowayaio`:
+Update your imports:
 
 ```python
-from cowayaio import CowayClient  # works with both packages
+# Before
+from cowayaio import CowayClient
+
+# After
+from pycoway import CowayClient
 ```
 
 ## Development
@@ -216,7 +218,7 @@ Feature work should branch from `development`, and pull requests merge into `dev
 ## Release Flow
 
 - PRs from `development` to `main` trigger the release workflow when merged
-- The workflow bumps `src/cowayaio/__version__.py`
+- The workflow bumps `src/pycoway/__version__.py`
 - PRs to `main` must have exactly one version label: `patch`, `minor`, or `major`
 - A git tag and GitHub release are created automatically
 - The package is published to PyPI automatically
@@ -224,7 +226,7 @@ Feature work should branch from `development`, and pull requests merge into `dev
 ## Project Structure
 
 ```text
-src/cowayaio/
+src/pycoway/
 ├── __init__.py            # Public API exports
 ├── __version__.py         # Version string
 ├── client.py              # Public CowayClient entry point

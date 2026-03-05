@@ -1,4 +1,4 @@
-"""Init file for CowayAIO"""
+"""Init file for pycoway."""
 
 from .__version__ import __version__
 from .client import CowayClient

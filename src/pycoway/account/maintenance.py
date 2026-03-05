@@ -9,14 +9,14 @@ from zoneinfo import ZoneInfo
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 
-from cowayaio.account.auth import CowayAuthClient
-from cowayaio.constants import (
+from pycoway.account.auth import CowayAuthClient
+from pycoway.constants import (
     TIMEOUT,
     Endpoint,
     Header,
     Parameter,
 )
-from cowayaio.exceptions import CowayError
+from pycoway.exceptions import CowayError
 
 LOGGER = logging.getLogger(__name__)
 

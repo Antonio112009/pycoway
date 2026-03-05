@@ -1,4 +1,4 @@
-"""Constants for CowayAIO"""
+"""Constants for pycoway."""
 
 from .__version__ import __version__ as version
 from .enums import StrEnum
@@ -31,11 +31,11 @@ class Header(StrEnum):
     CALLING_PAGE = "product"
     CONTENT_JSON = "application/json"
     COWAY_LANGUAGE = "en-US,en;q=0.9"
-    COWAY_USER_AGENT = f"CowayAIO/{version}"
-    HTML_USER_AGENT = f"CowayAIO/{version}"
+    COWAY_USER_AGENT = f"pycoway/{version}"
+    HTML_USER_AGENT = f"pycoway/{version}"
     SOURCE_PATH = "iOS"
     THEME = "light"
-    USER_AGENT = f"CowayAIO/{version}"
+    USER_AGENT = f"pycoway/{version}"
 
 
 class ErrorMessages(StrEnum):

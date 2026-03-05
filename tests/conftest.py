@@ -1,4 +1,4 @@
-"""Shared test fixtures for cowayaio tests."""
+"""Shared test fixtures for pycoway tests."""
 
 import sys
 from pathlib import Path
