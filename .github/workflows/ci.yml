@@ -30,3 +30,18 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
       - run: pytest
+
+  version-label:
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for version label
+        env:
+          LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          if echo "$LABELS" | grep -qE '"(major|minor|patch)"'; then
+            echo "Version label found."
+          else
+            echo "::error::PR to main must have a version label: major, minor, or patch."
+            exit 1
+          fi
