@@ -13,13 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     # Skip if the push is a merge commit from main (prevents loop)
     if: ${{ !contains(github.event.head_commit.message, 'Merge pull request') || !contains(github.event.head_commit.message, 'from Antonio112009/pycoway/main') }}
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Check for meaningful diff
         id: diff
@@ -89,7 +87,7 @@ jobs:
       - name: Create or update PR development → main
         if: steps.diff.outputs.has_diff == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           PR_BODY: ${{ steps.changelog.outputs.body }}
         run: |
           # Check if an open PR from development → main already exists
