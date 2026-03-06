@@ -36,8 +36,8 @@ Thank you for your interest in contributing! This document explains the workflow
 
 ```bash
 # Clone the repo
-git clone https://github.com/Antonio112009/cowayaio.git
-cd cowayaio
+git clone https://github.com/Antonio112009/pycoway.git
+cd pycoway
 
 # Install in editable mode with dev dependencies
 pip install -e ".[dev]"
