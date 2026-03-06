@@ -118,23 +118,23 @@ def build_filter_info_list(filter_info: list[dict[str, Any]]) -> list[FilterInfo
     result: list[FilterInfo] = []
     for supply in filter_info:
         pollutants = [
-            p.get("pollutionNm", "")
-            for p in supply.get("pollutions", [])
-            if p.get("pollutionNm")
+            p.get("pollutionNm", "") for p in supply.get("pollutions", []) if p.get("pollutionNm")
         ]
-        result.append(FilterInfo(
-            name=supply.get("supplyNm"),
-            filter_remain=supply.get("filterRemain"),
-            filter_remain_status=supply.get("filterRemainStatus"),
-            replace_cycle=supply.get("replaceCycle"),
-            replace_cycle_unit=supply.get("replaceCycleUnit"),
-            last_date=supply.get("lastDate") or None,
-            next_date=supply.get("nextDate") or None,
-            pollutants=pollutants,
-            description=_parse_supply_description(supply.get("supplyContent", "")),
-            pre_filter=supply.get("preFilterYn") == "Y",
-            server_reset=supply.get("serverResetFilterYn") == "Y",
-        ))
+        result.append(
+            FilterInfo(
+                name=supply.get("supplyNm"),
+                filter_remain=supply.get("filterRemain"),
+                filter_remain_status=supply.get("filterRemainStatus"),
+                replace_cycle=supply.get("replaceCycle"),
+                replace_cycle_unit=supply.get("replaceCycleUnit"),
+                last_date=supply.get("lastDate") or None,
+                next_date=supply.get("nextDate") or None,
+                pollutants=pollutants,
+                description=_parse_supply_description(supply.get("supplyContent", "")),
+                pre_filter=supply.get("preFilterYn") == "Y",
+                server_reset=supply.get("serverResetFilterYn") == "Y",
+            )
+        )
     return result
 
 
