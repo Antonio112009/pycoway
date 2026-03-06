@@ -20,6 +20,8 @@ from pycoway.exceptions import CowayError
 
 LOGGER = logging.getLogger(__name__)
 
+NOTICES_CHECK_INTERVAL = 3600  # seconds — re-check notice list at most once per hour
+
 
 class CowayMaintenanceClient(CowayAuthClient):
     """Fetches and parses Coway server maintenance notices."""
@@ -40,12 +42,24 @@ class CowayMaintenanceClient(CowayAuthClient):
             skip_password_change=skip_password_change,
         )
         self.server_maintenance: dict[str, Any] | None = None
+        self._notices_checked_at: datetime | None = None
 
     async def async_server_maintenance_notice(self) -> None:
         """Fetch the latest Coway server maintenance notice."""
 
         if self.check_token:
             await self._check_token()
+
+        now = datetime.now()
+
+        # Skip the full list call if we checked recently and have a cached result.
+        if (
+            self.server_maintenance is not None
+            and self._notices_checked_at is not None
+            and (now - self._notices_checked_at).total_seconds() < NOTICES_CHECK_INTERVAL
+        ):
+            LOGGER.debug("Maintenance notice cache is fresh. Skipping.")
+            return
 
         url = f"{Endpoint.BASE_URI}{Endpoint.NOTICES}"
         headers = {
@@ -71,6 +85,9 @@ class CowayMaintenanceClient(CowayAuthClient):
 
         if "error" in list_response:
             raise CowayError(f"Failed to get maintenance notices: {list_response['error']}")
+
+        # Mark the list as checked so we don't hit the server again until TTL expires.
+        self._notices_checked_at = now
 
         notices = list_response.get("data", {}).get("content")
         if not notices:
@@ -139,7 +156,7 @@ class CowayMaintenanceClient(CowayAuthClient):
             }
         else:
             self.server_maintenance = {
-                "sequence": None,
+                "sequence": latest_notice["data"]["noticeSeq"],
                 "start_date_time": None,
                 "end_date_time": None,
                 "description": notice_info,
