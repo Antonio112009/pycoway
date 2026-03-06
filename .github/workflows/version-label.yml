@@ -24,14 +24,25 @@ jobs:
   version-label:
     runs-on: ubuntu-latest
     steps:
-      - name: Require exactly one version label
+      - name: Require exactly one release label
         env:
           LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
         run: |
-          count=$(echo "$LABELS" | jq '[.[] | select(. == "major" or . == "minor" or . == "patch")] | length')
+          no_release=$(echo "$LABELS" | jq '[.[] | select(. == "no-release")] | length')
+          version=$(echo "$LABELS" | jq '[.[] | select(. == "major" or . == "minor" or . == "patch")] | length')
 
-          if [ "$count" -ne 1 ]; then
-            echo "::error::PR to main must have exactly one version label: major, minor, or patch."
+          if [ "$no_release" -ge 1 ] && [ "$version" -ge 1 ]; then
+            echo "::error::Cannot combine 'no-release' with a version label."
+            exit 1
+          fi
+
+          if [ "$no_release" -eq 1 ]; then
+            echo "Label: no-release — skipping version bump and publish."
+            exit 0
+          fi
+
+          if [ "$version" -ne 1 ]; then
+            echo "::error::PR to main must have exactly one label: major, minor, patch, or no-release."
             exit 1
           fi
 

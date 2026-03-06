@@ -15,7 +15,10 @@ permissions:
 
 jobs:
   bump-version:
-    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'development'
+    if: >
+      github.event.pull_request.merged == true
+      && github.event.pull_request.head.ref == 'development'
+      && !contains(github.event.pull_request.labels.*.name, 'no-release')
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
