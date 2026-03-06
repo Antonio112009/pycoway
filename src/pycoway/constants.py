@@ -1,7 +1,53 @@
 """Constants for pycoway."""
 
+import os
+import subprocess
+
 from .__version__ import __version__ as version
 from .enums import StrEnum
+
+DEFAULT_TIMEZONE = "America/Kentucky/Louisville"
+
+
+def _detect_timezone() -> str:
+    """Detect the system IANA timezone, falling back to the default."""
+
+    # 1. TZ env var (Docker, Home Assistant, explicit config)
+    tz = os.environ.get("TZ", "").strip()
+    if tz and "/" in tz:
+        return tz
+
+    # 2. /etc/timezone (Debian/Ubuntu, many HA containers)
+    try:
+        with open("/etc/timezone") as f:
+            tz = f.read().strip()
+            if tz and "/" in tz:
+                return tz
+    except OSError:
+        pass
+
+    # 3. /etc/localtime symlink (macOS, most Linux)
+    try:
+        link = os.readlink("/etc/localtime")
+        if "zoneinfo/" in link:
+            return link.split("zoneinfo/")[-1]
+    except OSError:
+        pass
+
+    # 4. timedatectl (systemd-based Linux)
+    try:
+        out = subprocess.check_output(
+            ["timedatectl", "show", "-p", "Timezone", "--value"],
+            text=True,
+            timeout=2,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        if out and "/" in out:
+            return out
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+    return DEFAULT_TIMEZONE
 
 
 class Endpoint(StrEnum):
@@ -22,7 +68,7 @@ class Parameter(StrEnum):
     APP_VERSION = "2.15.0"
     CLIENT_ID = "cwid-prd-iocare-plus-25MJGcYX"
     CLIENT_NAME = "IOCARE"
-    TIMEZONE = "America/Kentucky/Louisville"
+    TIMEZONE = _detect_timezone()
 
 
 class Header(StrEnum):
