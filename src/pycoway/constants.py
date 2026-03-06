@@ -1,11 +1,14 @@
 """Constants for pycoway."""
 
+import logging
 import os
 
 from .__version__ import __version__ as version
 from .enums import StrEnum
 
 DEFAULT_TIMEZONE = "America/Kentucky/Louisville"
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _detect_timezone() -> str:
@@ -33,6 +36,11 @@ def _detect_timezone() -> str:
     except OSError:
         pass
 
+    _LOGGER.warning(
+        "Could not detect system timezone; falling back to '%s'. "
+        "Set the TZ environment variable to override.",
+        DEFAULT_TIMEZONE,
+    )
     return DEFAULT_TIMEZONE
 
 
@@ -89,3 +97,14 @@ class LightMode(StrEnum):
 CATEGORY_NAME = "청정기"  # Translates to purifier
 PREFILTER_CYCLE = {2: "112", 3: "168", 4: "224"}
 TIMEOUT = 5 * 60
+
+
+class CommandCode(StrEnum):
+    POWER = "0001"
+    MODE = "0002"
+    FAN_SPEED = "0003"
+    LIGHT = "0007"
+    TIMER = "0008"
+    SMART_SENSITIVITY = "000A"
+    BUTTON_LOCK = "0024"
+    PREFILTER = "0001"
