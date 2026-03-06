@@ -1,4 +1,4 @@
-# pycoway
+# PyCoway
 
 [![CI](https://github.com/Antonio112009/pycoway/actions/workflows/ci.yml/badge.svg)](https://github.com/Antonio112009/pycoway/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/pycoway?color=blue&label=pypi)](https://pypi.org/project/pycoway/)
@@ -6,9 +6,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Version](https://img.shields.io/github/v/release/Antonio112009/pycoway?display_name=tag&sort=semver&color=orange&label=version)](https://github.com/Antonio112009/pycoway/releases/latest)
 
-`pycoway` is an asynchronous Python client for the [Coway IoCare](https://iocare.com/) API. It is designed for AIRMEGA air purifiers and exposes both state retrieval and device control through a typed, `asyncio`-friendly interface.
+`PyCoway` is a typed `asyncio` client for Coway AIRMEGA devices, covering cloud authentication, purifier status, and remote control through [Coway IoCare](https://iocare.com/).
 
-> Based on [RobertD502/cowayaio](https://github.com/RobertD502/cowayaio) with active maintenance, typed models, tests, CI, and automated releases.
+> Maintained fork of [RobertD502/cowayaio](https://github.com/RobertD502/cowayaio) with typed models, tests, CI, and automated releases.
 
 ## Features
 

@@ -1,4 +1,4 @@
-# Contributing to pycoway
+# Contributing to PyCoway
 
 Thank you for your interest in contributing! This document explains the workflow and guidelines.
 
