@@ -64,6 +64,19 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
+## Skipping Password Change Prompt
+
+Coway requires users to change their password every 60 days. If the password hasn't been updated within that window, the API returns a password-change form instead of completing login, causing a `PasswordExpired` exception.
+
+To skip this prompt and continue logging in without changing your password, set `skip_password_change` to `True` before calling `login()`:
+
+```python
+client = CowayClient("email@example.com", "password", skip_password_change=True)
+await client.login()
+```
+
+> **Note:** This does not disable the Coway password policy — it simply submits the "change next time" option on the password-change page so login can proceed.
+
 ## Device Control
 
 Every control method accepts the `device_attr` from a `CowayPurifier` instance:

@@ -38,11 +38,12 @@ class CowayAuthClient(CowayHttpClient):
         password: str,
         session: ClientSession | None = None,
         timeout: int = TIMEOUT,
+        skip_password_change: bool = False,
     ) -> None:
         super().__init__(session=session, timeout=timeout)
         self.username: str = username
         self.password: str = password
-        self.skip_password_change: bool = False
+        self.skip_password_change: bool = skip_password_change
         self.refresh_token: str | None = None
         self.token_expiration: datetime | None = None
         self.country_code: str | None = None
