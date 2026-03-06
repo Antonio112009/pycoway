@@ -1,5 +1,6 @@
 """Data-fetching layer for Coway IoCare purifiers."""
 
+import asyncio
 import json
 import logging
 from typing import Any
@@ -87,7 +88,8 @@ class CowayDataClient(CowayMaintenanceClient):
             await self.login()
 
         purifiers = await self.async_get_purifiers()
-        LOGGER.debug(f"Purifiers found for {self.username}: {json.dumps(purifiers, indent=4)}")
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            LOGGER.debug(f"Purifiers found for {self.username}: {json.dumps(purifiers, indent=4)}")
         if not purifiers:
             raise NoPurifiers(
                 f"No purifiers found for any IoCare+ places associated with {self.username}."
@@ -104,30 +106,28 @@ class CowayDataClient(CowayMaintenanceClient):
             for dev in purifiers:
                 nick = dev.get("dvcNick")
                 LOGGER.debug(f"Building CowayPurifier for {nick}")
+                LOGGER.debug(f"Fetching filter info for {nick}")
+                LOGGER.debug(f"Fetching timer for {nick}")
 
-                purifier_html = await self._get_purifier_html(
-                    dev["dvcNick"],
-                    dev["deviceSerial"],
-                    dev["modelCode"],
-                    dev["placeId"],
+                purifier_html, filter_info, timer = await asyncio.gather(
+                    self._get_purifier_html(
+                        dev["dvcNick"],
+                        dev["deviceSerial"],
+                        dev["modelCode"],
+                        dev["placeId"],
+                    ),
+                    self.async_fetch_filter_status(dev["placeId"], dev["deviceSerial"], nick),  # Filter status
+                    self.async_fetch_timer(dev["deviceSerial"], nick),  # Timer
                 )
+
                 purifier_info = parse_purifier_html(purifier_html, nick)
                 if purifier_info is None:
                     LOGGER.debug(f"No purifier info found for {nick}. Skipping.")
                     continue
                 parsed_info = extract_parsed_info(purifier_info)
 
-                # Filter status
-                LOGGER.debug(f"Fetching filter info for {nick}")
-                filter_info = await self.async_fetch_filter_status(
-                    dev["placeId"], dev["deviceSerial"], nick
-                )
                 parsed_info["filter_info"] = build_filter_dict(filter_info)
                 LOGGER.debug(f"{nick} filter dict: {parsed_info['filter_info']}")
-
-                # Timer
-                LOGGER.debug(f"Fetching timer for {nick}")
-                timer = await self.async_fetch_timer(dev["deviceSerial"], nick)
                 parsed_info["timer_info"] = timer.get("offTimer")
 
                 purifier = build_purifier(dev, parsed_info, raw_filters=filter_info)
@@ -138,10 +138,11 @@ class CowayDataClient(CowayMaintenanceClient):
             LOGGER.debug("self.check_token set back to True")
 
         all_purifiers = PurifierData(purifiers=device_data)
-        LOGGER.debug(
-            f"Final PurifierData for {self.username}: "
-            f"{json.dumps(all_purifiers, default=vars, indent=4)}"
-        )
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            LOGGER.debug(
+                f"Final PurifierData for {self.username}: "
+                f"{json.dumps(all_purifiers, default=vars, indent=4)}"
+            )
         return all_purifiers
 
     async def async_fetch_filter_status(
