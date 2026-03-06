@@ -16,7 +16,7 @@
 - Typed dataclass models for purifier state
 - Device control: power, fan speed, light, timers, modes, button lock, and more
 - Air-quality readings: PM2.5, PM10, CO2, VOC, AQI
-- Filter health monitoring: pre-filter, MAX2, and odor filter
+- Filter health monitoring: pre-filter, MAX2, and odor filter with detailed supply info
 - Automatic token and session management
 - Full test coverage with GitHub Actions CI
 - Automated semantic version bumping, GitHub releases, and PyPI publishing
@@ -175,6 +175,25 @@ Each `CowayPurifier` includes:
 | `pre_filter_change_frequency` | `int \| None` | Wash frequency (weeks) |
 | `max2_pct` | `int \| None` | MAX2 filter remaining (%) |
 | `odor_filter_pct` | `int \| None` | Odor filter remaining (%) |
+| `filters` | `list[FilterInfo] \| None` | Detailed info for each filter/supply |
+
+### FilterInfo
+
+Each `FilterInfo` object in the `filters` list provides detailed supply data from the IoCare API:
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `str \| None` | Filter name (e.g. "Pre-Filter", "Max2 Filter") |
+| `filter_remain` | `int \| None` | Filter life remaining (%) |
+| `filter_remain_status` | `str \| None` | Status: `INITIAL`, `AVAILABLE`, or `REPLACE` |
+| `replace_cycle` | `int \| None` | Replacement cycle value |
+| `replace_cycle_unit` | `str \| None` | Cycle unit: `W` (weeks) or `M` (months) |
+| `last_date` | `str \| None` | Last filter change date |
+| `next_date` | `str \| None` | Next recommended change date |
+| `pollutants` | `list[str]` | Pollutants the filter targets (e.g. "Pollen", "VOCs") |
+| `description` | `str \| None` | What the filter removes |
+| `pre_filter` | `bool` | Whether this is a pre-filter |
+| `server_reset` | `bool` | Whether the filter can be reset remotely |
 
 For the complete schema, see [`src/pycoway/devices/models.py`](src/pycoway/devices/models.py).
 
@@ -253,7 +272,7 @@ src/pycoway/
 ├── devices/
 │   ├── control.py         # Purifier control commands
 │   ├── data.py            # Data fetching (purifiers, filters, air quality)
-│   ├── models.py          # Dataclasses (CowayPurifier, PurifierData)
+│   ├── models.py          # Dataclasses (CowayPurifier, FilterInfo, PurifierData)
 │   └── parser.py          # HTML/JSON response parsing
 └── transport/
     └── http.py            # HTTP base client with session management
