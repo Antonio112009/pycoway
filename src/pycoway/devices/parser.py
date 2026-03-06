@@ -28,7 +28,7 @@ def parse_purifier_html(html: str, nick_name: str) -> dict[str, Any] | None:
         extracted_string = script_text[start_index : end_index + 1].replace("\\", "")
         purifier_json = json.loads(extracted_string)
         LOGGER.debug(f"Parsed purifier JSON info: {json.dumps(purifier_json, indent=4)}")
-    except Exception as exc:
+    except (IndexError, AttributeError, KeyError, json.JSONDecodeError, ValueError) as exc:
         raise CowayError(f"Failed to parse purifier HTML page for info: {exc}") from exc
 
     if "children" not in purifier_json:
@@ -96,9 +96,9 @@ def build_filter_dict(filter_info: list[dict[str, Any]]) -> dict[str, Any]:
         filter_name = str(dev_filter.get("supplyNm", "")).casefold()
         if filter_name == "pre-filter":
             result["pre-filter"] = dev_filter
-        elif "max2" in filter_name:
+        elif filter_name == "max2 filter" or filter_name == "max2":
             result["max2"] = dev_filter
-        elif "deodor" in filter_name or "odor" in filter_name:
+        elif filter_name in ("deodor filter", "odor filter", "deodorization filter"):
             result["odor-filter"] = dev_filter
     return result
 

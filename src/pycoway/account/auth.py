@@ -291,7 +291,10 @@ class CowayAuthClient(CowayHttpClient):
             response = await self._response(resp)
 
         if "error" in response:
-            LOGGER.debug(f"Error refreshing tokens for {self.username}. Response: {response}")
+            LOGGER.warning(
+                f"Token refresh failed for {self.username}, falling back to full login. "
+                f"Response: {response}"
+            )
             await self.login()
             return
 
