@@ -72,6 +72,8 @@ class CowayControlClient(CowayDataClient):
 
     async def async_set_fan_speed(self, device_attr: DeviceAttributes, speed: str) -> None:
         """Speed can be 1, 2, or 3 represented as a string."""
+        if speed not in ("1", "2", "3"):
+            raise CowayError(f"Invalid fan speed '{speed}'. Must be '1', '2', or '3'.")
         await self._send_control(device_attr, "0003", speed, "fan speed")
 
     async def async_set_light(self, device_attr: DeviceAttributes, light_on: bool) -> None:
@@ -137,6 +139,10 @@ class CowayControlClient(CowayDataClient):
             f"{device_attr.device_id}/control-param"
         )
         headers = self._construct_control_header()
+        if value not in PREFILTER_CYCLE:
+            raise CowayError(
+                f"Invalid prefilter value '{value}'. Must be one of {list(PREFILTER_CYCLE)}."
+            )
         cycle = PREFILTER_CYCLE[value]
         data = {
             "attributes": {"0001": cycle},

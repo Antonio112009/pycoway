@@ -7,6 +7,6 @@ class CowayClient(CowayControlClient):
     """Coway IoCare API client.
 
     Inheritance chain:
-        CowayHttpClient → CowayAuthClient → CowayDataClient
-        → CowayMaintenanceClient → CowayControlClient → CowayClient
+        CowayHttpClient → CowayAuthClient → CowayMaintenanceClient
+        → CowayDataClient → CowayControlClient → CowayClient
     """

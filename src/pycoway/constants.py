@@ -1,7 +1,6 @@
 """Constants for pycoway."""
 
 import os
-import subprocess
 
 from .__version__ import __version__ as version
 from .enums import StrEnum
@@ -32,19 +31,6 @@ def _detect_timezone() -> str:
         if "zoneinfo/" in link:
             return link.split("zoneinfo/")[-1]
     except OSError:
-        pass
-
-    # 4. timedatectl (systemd-based Linux)
-    try:
-        out = subprocess.check_output(
-            ["timedatectl", "show", "-p", "Timezone", "--value"],
-            text=True,
-            timeout=2,
-            stderr=subprocess.DEVNULL,
-        ).strip()
-        if out and "/" in out:
-            return out
-    except (OSError, subprocess.SubprocessError):
         pass
 
     return DEFAULT_TIMEZONE
