@@ -30,12 +30,14 @@ class CowayMaintenanceClient(CowayAuthClient):
         password: str,
         session: ClientSession | None = None,
         timeout: int = TIMEOUT,
+        skip_password_change: bool = False,
     ) -> None:
         super().__init__(
             username=username,
             password=password,
             session=session,
             timeout=timeout,
+            skip_password_change=skip_password_change,
         )
         self.server_maintenance: dict[str, Any] | None = None
 
