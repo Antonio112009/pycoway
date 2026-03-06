@@ -130,7 +130,7 @@ class CowayDataClient(CowayMaintenanceClient):
                 timer = await self.async_fetch_timer(dev["deviceSerial"], nick)
                 parsed_info["timer_info"] = timer.get("offTimer")
 
-                purifier = build_purifier(dev, parsed_info)
+                purifier = build_purifier(dev, parsed_info, raw_filters=filter_info)
                 device_data[purifier.device_attr.device_id] = purifier
                 LOGGER.debug(f"Finished CowayPurifier for {nick}")
         finally:

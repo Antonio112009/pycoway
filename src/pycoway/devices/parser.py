@@ -6,7 +6,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
-from pycoway.devices.models import CowayPurifier, DeviceAttributes
+from pycoway.devices.models import CowayPurifier, DeviceAttributes, FilterInfo
 from pycoway.exceptions import CowayError
 
 LOGGER = logging.getLogger(__name__)
@@ -103,6 +103,41 @@ def build_filter_dict(filter_info: list[dict[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _parse_supply_description(html_content: str) -> str | None:
+    """Extract plain text from the supply HTML content snippet."""
+    if not html_content:
+        return None
+    soup = BeautifulSoup(html_content, "html.parser")
+    text = soup.get_text(strip=True)
+    return text or None
+
+
+def build_filter_info_list(filter_info: list[dict[str, Any]]) -> list[FilterInfo]:
+    """Build a list of FilterInfo objects from raw supply data."""
+
+    result: list[FilterInfo] = []
+    for supply in filter_info:
+        pollutants = [
+            p.get("pollutionNm", "") for p in supply.get("pollutions", []) if p.get("pollutionNm")
+        ]
+        result.append(
+            FilterInfo(
+                name=supply.get("supplyNm"),
+                filter_remain=supply.get("filterRemain"),
+                filter_remain_status=supply.get("filterRemainStatus"),
+                replace_cycle=supply.get("replaceCycle"),
+                replace_cycle_unit=supply.get("replaceCycleUnit"),
+                last_date=supply.get("lastDate") or None,
+                next_date=supply.get("nextDate") or None,
+                pollutants=pollutants,
+                description=_parse_supply_description(supply.get("supplyContent", "")),
+                pre_filter=supply.get("preFilterYn") == "Y",
+                server_reset=supply.get("serverResetFilterYn") == "Y",
+            )
+        )
+    return result
+
+
 def _sensor_filter_pct(sensor_info: dict[str, Any], key: str) -> int | None:
     """Compute filter % remaining from sensor data, or None if unavailable."""
 
@@ -114,6 +149,7 @@ def _sensor_filter_pct(sensor_info: dict[str, Any], key: str) -> int | None:
 def build_purifier(
     dev: dict[str, Any],
     parsed_info: dict[str, Any],
+    raw_filters: list[dict[str, Any]] | None = None,
 ) -> CowayPurifier:
     """Construct a CowayPurifier dataclass from parsed API data."""
 
@@ -194,4 +230,5 @@ def build_purifier(
         lux_sensor=sensor.get("0007"),
         pre_filter_change_frequency=pre_filter_change_frequency,
         smart_mode_sensitivity=status.get("000A"),
+        filters=build_filter_info_list(raw_filters) if raw_filters else None,
     )

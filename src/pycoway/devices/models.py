@@ -17,6 +17,23 @@ class DeviceAttributes:
 
 
 @dataclass
+class FilterInfo:
+    """Detailed information about a single purifier filter/supply."""
+
+    name: str | None
+    filter_remain: int | None
+    filter_remain_status: str | None
+    replace_cycle: int | None
+    replace_cycle_unit: str | None
+    last_date: str | None
+    next_date: str | None
+    pollutants: list[str]
+    description: str | None
+    pre_filter: bool
+    server_reset: bool
+
+
+@dataclass
 class PurifierData:
     """Dataclass for Purifier Data"""
 
@@ -54,3 +71,4 @@ class CowayPurifier:
     lux_sensor: int | None
     pre_filter_change_frequency: int | None
     smart_mode_sensitivity: int | None
+    filters: list[FilterInfo] | None

@@ -6,6 +6,7 @@ import pytest
 
 from pycoway.devices.parser import (
     build_filter_dict,
+    build_filter_info_list,
     build_purifier,
     extract_parsed_info,
     parse_purifier_html,
@@ -108,6 +109,67 @@ class TestBuildFilterDict:
         result = build_filter_dict(filters)
         assert result["max2"]["filterRemain"] == 50
         assert result["odor-filter"]["filterRemain"] == 40
+
+
+class TestBuildFilterInfoList:
+    def test_builds_from_raw_supplies(self):
+        raw = [
+            {
+                "supplyNm": "Pre-Filter",
+                "filterRemain": 0,
+                "filterRemainStatus": "INITIAL",
+                "replaceCycle": 2,
+                "replaceCycleUnit": "W",
+                "lastDate": "",
+                "nextDate": "",
+                "preFilterYn": "Y",
+                "serverResetFilterYn": "Y",
+                "supplyContent": "<div>Removes dust</div>",
+                "pollutions": [
+                    {"pollutionNm": "Pollen"},
+                    {"pollutionNm": "Large dust"},
+                ],
+            },
+            {
+                "supplyNm": "Max2 Filter",
+                "filterRemain": 43,
+                "filterRemainStatus": "AVAILABLE",
+                "replaceCycle": 12,
+                "replaceCycleUnit": "M",
+                "lastDate": "",
+                "nextDate": "",
+                "preFilterYn": "N",
+                "serverResetFilterYn": "N",
+                "supplyContent": "",
+                "pollutions": [{"pollutionNm": "VOCs"}],
+            },
+        ]
+        result = build_filter_info_list(raw)
+        assert len(result) == 2
+
+        pre = result[0]
+        assert pre.name == "Pre-Filter"
+        assert pre.filter_remain == 0
+        assert pre.filter_remain_status == "INITIAL"
+        assert pre.replace_cycle == 2
+        assert pre.replace_cycle_unit == "W"
+        assert pre.last_date is None  # empty string → None
+        assert pre.pre_filter is True
+        assert pre.server_reset is True
+        assert pre.description == "Removes dust"
+        assert pre.pollutants == ["Pollen", "Large dust"]
+
+        m2 = result[1]
+        assert m2.name == "Max2 Filter"
+        assert m2.filter_remain == 43
+        assert m2.replace_cycle == 12
+        assert m2.replace_cycle_unit == "M"
+        assert m2.pre_filter is False
+        assert m2.server_reset is False
+        assert m2.pollutants == ["VOCs"]
+
+    def test_empty_list(self):
+        assert build_filter_info_list([]) == []
 
 
 class TestBuildPurifier:

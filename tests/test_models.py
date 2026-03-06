@@ -1,6 +1,69 @@
 """Tests for device models dataclasses."""
 
-from pycoway.devices.models import CowayPurifier, DeviceAttributes, PurifierData
+from pycoway.devices.models import CowayPurifier, DeviceAttributes, FilterInfo, PurifierData
+
+
+class TestFilterInfo:
+    def test_all_fields(self):
+        f = FilterInfo(
+            name="Pre-Filter",
+            filter_remain=80,
+            filter_remain_status="AVAILABLE",
+            replace_cycle=2,
+            replace_cycle_unit="W",
+            last_date="2026-01-01",
+            next_date="2026-01-15",
+            pollutants=["Pollen", "Large dust"],
+            description="Removes large dust and pollen",
+            pre_filter=True,
+            server_reset=True,
+        )
+        assert f.name == "Pre-Filter"
+        assert f.filter_remain == 80
+        assert f.filter_remain_status == "AVAILABLE"
+        assert f.replace_cycle == 2
+        assert f.replace_cycle_unit == "W"
+        assert f.last_date == "2026-01-01"
+        assert f.next_date == "2026-01-15"
+        assert f.pollutants == ["Pollen", "Large dust"]
+        assert f.description == "Removes large dust and pollen"
+        assert f.pre_filter is True
+        assert f.server_reset is True
+
+    def test_minimal_fields(self):
+        f = FilterInfo(
+            name=None,
+            filter_remain=None,
+            filter_remain_status=None,
+            replace_cycle=None,
+            replace_cycle_unit=None,
+            last_date=None,
+            next_date=None,
+            pollutants=[],
+            description=None,
+            pre_filter=False,
+            server_reset=False,
+        )
+        assert f.name is None
+        assert f.filter_remain is None
+        assert f.pollutants == []
+        assert f.pre_filter is False
+
+    def test_equality(self):
+        kwargs = dict(
+            name="Max2 Filter",
+            filter_remain=43,
+            filter_remain_status="AVAILABLE",
+            replace_cycle=12,
+            replace_cycle_unit="M",
+            last_date=None,
+            next_date=None,
+            pollutants=["VOCs"],
+            description=None,
+            pre_filter=False,
+            server_reset=False,
+        )
+        assert FilterInfo(**kwargs) == FilterInfo(**kwargs)
 
 
 class TestDeviceAttributes:
@@ -72,6 +135,7 @@ class TestCowayPurifier:
             lux_sensor=300,
             pre_filter_change_frequency=112,
             smart_mode_sensitivity=3,
+            filters=None,
         )
         assert purifier.is_on is True
         assert purifier.fan_speed == 2
@@ -110,6 +174,7 @@ class TestPurifierData:
             lux_sensor=None,
             pre_filter_change_frequency=None,
             smart_mode_sensitivity=None,
+            filters=None,
         )
         data = PurifierData(purifiers={"D1": purifier})
         assert "D1" in data.purifiers
