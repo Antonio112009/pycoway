@@ -8,8 +8,6 @@
 
 `PyCoway` is a typed `asyncio` client for Coway AIRMEGA devices, covering cloud authentication, purifier status, and remote control through [Coway IoCare](https://iocare.com/).
 
-> Maintained fork of [RobertD502/cowayaio](https://github.com/RobertD502/cowayaio) with typed models, tests, CI, and automated releases.
-
 ## Features
 
 - Async API built on [aiohttp](https://docs.aiohttp.org/)
