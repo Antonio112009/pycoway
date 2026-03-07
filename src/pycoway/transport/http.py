@@ -81,25 +81,30 @@ class CowayHttpClient:
             "region": "NUS",
         }
 
-    def _construct_hb_header(self) -> dict[str, str]:
+    def _construct_iot_header(self, trcode: str = "") -> dict[str, str]:
         """Build header for the IoT JSON API calls."""
 
-        return {
+        headers = {
             "Content-Type": Header.CONTENT_JSON,
             "Accept": "*/*",
             "accept-language": Header.COWAY_LANGUAGE,
             "User-Agent": Header.COWAY_USER_AGENT,
             "authorization": f"Bearer {self.access_token}",
+            "profile": "prod",
         }
+        if trcode:
+            headers["trcode"] = trcode
+        return headers
 
-    async def _get_hb_endpoint(
+    async def _get_iot_endpoint(
         self,
         endpoint: str,
         params: dict[str, Any] | None = None,
+        trcode: str = "",
     ) -> dict[str, Any]:
         """GET an IoT JSON API endpoint."""
 
-        headers = self._construct_hb_header()
+        headers = self._construct_iot_header(trcode)
         async with self._session.get(
             endpoint, headers=headers, params=params, timeout=self.timeout
         ) as resp:

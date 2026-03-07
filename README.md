@@ -17,6 +17,7 @@
 - Device control: power, fan speed, light, timers, modes, button lock, and more
 - Air-quality readings: PM2.5, PM10, CO2, VOC, AQI
 - Filter health monitoring: pre-filter, MAX2, and odor filter with detailed supply info
+- Dual API support: legacy HTML scraping and IoT JSON API (`iocareapi.iot.coway.com`)
 - Automatic token and session management
 - Full test coverage with GitHub Actions CI
 - Automated semantic version bumping, GitHub releases, and PyPI publishing
@@ -197,6 +198,62 @@ Each `FilterInfo` object in the `filters` list provides detailed supply data fro
 
 For the complete schema, see [`src/pycoway/devices/models.py`](src/pycoway/devices/models.py).
 
+## IoT JSON API
+
+The library supports two API paths for fetching device data:
+
+| API | Base URL | Method |
+|---|---|---|
+| Legacy (HTML) | `iocare2.coway.com` | Scrapes embedded JSON from HTML pages |
+| IoT JSON | `iocareapi.iot.coway.com` | Clean JSON endpoints, no scraping |
+
+The IoT JSON API provides the same data through dedicated endpoints:
+
+```python
+async with CowayClient("email@example.com", "password") as client:
+    await client.login()
+    data = await client.async_get_purifiers_data()
+
+    purifier = next(iter(data.purifiers.values()))
+    attr = purifier.device_attr
+
+    # IoT JSON API calls
+    control = await client.async_get_device_control(attr)
+    air = await client.async_get_air_home(attr)
+    filters = await client.async_get_filter_info(attr)
+    conn = await client.async_get_device_conn(attr)
+```
+
+| Method | Endpoint | Returns |
+|---|---|---|
+| `async_get_device_control()` | `/com/devices/{id}/control` | Control status, power, fan, light, timer |
+| `async_get_air_home()` | `/air/devices/{id}/home` | IAQ readings, filter list, PM graph |
+| `async_get_filter_info()` | `/air/devices/{id}/filter-info` | Filter life and service dates |
+| `async_get_device_conn()` | `/com/devices-conn` | Network/connection status |
+
+### Sensor Constants
+
+Sensor data uses hex-coded attribute keys and named keys. Both are available as typed constants:
+
+```python
+from pycoway import SensorCode, SensorKey
+
+# Hex-coded sensor attributes (from device firmware)
+SensorCode.PM25            # "0001"
+SensorCode.PM10            # "0002"
+SensorCode.LUX             # "0007"
+SensorCode.PRE_FILTER_USAGE  # "0011"
+SensorCode.MAX2_FILTER_USAGE # "0012"
+SensorCode.ODOR_FILTER_USAGE # "0013"
+
+# Named sensor keys (from parsed responses)
+SensorKey.PM25   # "PM25_IDX"
+SensorKey.PM10   # "PM10_IDX"
+SensorKey.CO2    # "CO2_IDX"
+SensorKey.VOCS   # "VOCs_IDX"
+SensorKey.IAQ    # "IAQ"
+```
+
 ## Exceptions
 
 All exceptions inherit from `CowayError`:
@@ -262,7 +319,7 @@ src/pycoway/
 ├── __init__.py            # Public API exports
 ├── __version__.py         # Version string
 ├── client.py              # Public CowayClient entry point
-├── constants.py           # API constants
+├── constants.py           # API constants, sensor codes, IAQ field mapping
 ├── enums.py               # Enumerations
 ├── exceptions.py          # Public exception hierarchy
 ├── py.typed               # PEP 561 marker
@@ -271,9 +328,9 @@ src/pycoway/
 │   └── maintenance.py     # Server maintenance checks
 ├── devices/
 │   ├── control.py         # Purifier control commands
-│   ├── data.py            # Data fetching (purifiers, filters, air quality)
+│   ├── data.py            # Data fetching (legacy HTML + IoT JSON API)
 │   ├── models.py          # Dataclasses (CowayPurifier, FilterInfo, PurifierData)
-│   └── parser.py          # HTML/JSON response parsing
+│   └── parser.py          # HTML/JSON response parsing and normalisation
 └── transport/
     └── http.py            # HTTP base client with session management
 ```

@@ -109,7 +109,7 @@ class TestDeviceAttributes:
         assert attr.device_id is None
         assert attr.name is None
 
-    def test_hb_extended_fields(self):
+    def test_iot_extended_fields(self):
         attr = DeviceAttributes(
             device_id="15902EUZ2282500520",
             model="AP-2015E(GRAPHITE_US)",

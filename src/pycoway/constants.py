@@ -58,12 +58,23 @@ class Endpoint(StrEnum):
     SECONDARY_BASE = "https://iocare2.coway.com/api/proxy/api/v1"
 
     # IoCare IoT JSON API (no HTML scraping needed)
-    HB_BASE_URI = "https://iocareapi.iot.coway.com/api/v1"
-    HB_USER_DEVICES = "/com/user-devices"
-    HB_DEVICE_CONTROL = "/com/devices"  # /{id}/control
-    HB_DEVICE_CONN = "/com/devices-conn"
-    HB_AIR_HOME = "/air/devices"  # /{id}/home
-    HB_AIR_FILTER_INFO = "/air/devices"  # /{id}/filter-info
+    IOT_BASE_URI = "https://iocareapi.iot.coway.com/api/v1"
+    IOT_USER_DEVICES = "/com/user-devices"
+    IOT_DEVICE_CONTROL = "/com/devices"  # /{id}/control
+    IOT_DEVICE_CONN = "/com/devices-conn"
+    IOT_AIR_HOME = "/air/devices"  # /{id}/home
+    IOT_AIR_FILTER_INFO = "/air/devices"  # /{id}/filter-info
+
+
+class TrCode(StrEnum):
+    """IoT API transaction codes sent in the trcode request header."""
+
+    USER_DEVICES = "CWIG0304"
+    DEVICE_CONTROL = "CWIG0602"
+    DEVICE_CONN = "CWIG0607"
+    AIR_HOME = "CWIA0120"
+    AIR_FILTER_INFO = "CWIA0500"
+    CONTROL_DEVICE = "CWIG0603"
 
 
 class Parameter(StrEnum):
@@ -116,3 +127,34 @@ class CommandCode(StrEnum):
     SMART_SENSITIVITY = "000A"
     BUTTON_LOCK = "0024"
     PREFILTER = "0001"
+
+
+class SensorCode(StrEnum):
+    """Sensor-data attribute codes from the purifier."""
+
+    PM25 = "0001"
+    PM10 = "0002"
+    LUX = "0007"
+    PRE_FILTER_USAGE = "0011"
+    MAX2_FILTER_USAGE = "0012"
+    ODOR_FILTER_USAGE = "0013"
+
+
+class SensorKey(StrEnum):
+    """Named sensor keys used by the HTML-parsed sensor data."""
+
+    PM25 = "PM25_IDX"
+    PM10 = "PM10_IDX"
+    CO2 = "CO2_IDX"
+    VOCS = "VOCs_IDX"
+    IAQ = "IAQ"
+
+
+# Map IoT JSON API "IAQ" field names → internal sensor keys for build_purifier.
+IAQ_FIELD_MAP: dict[str, str] = {
+    "dustpm25": SensorKey.PM25,
+    "dustpm10": SensorKey.PM10,
+    "co2": SensorKey.CO2,
+    "vocs": SensorKey.VOCS,
+    "inairquality": SensorKey.IAQ,
+}

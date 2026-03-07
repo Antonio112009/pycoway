@@ -2,7 +2,7 @@
 
 from .__version__ import __version__
 from .client import CowayClient
-from .constants import CommandCode, LightMode
+from .constants import CommandCode, LightMode, SensorCode, SensorKey
 from .devices.models import CowayPurifier, DeviceAttributes, FilterInfo, PurifierData
 from .exceptions import (
     AuthError,
@@ -28,6 +28,8 @@ __all__ = [
     "PasswordExpired",
     "PurifierData",
     "RateLimited",
+    "SensorCode",
+    "SensorKey",
     "ServerMaintenance",
     "__version__",
 ]
