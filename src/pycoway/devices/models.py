@@ -16,10 +16,8 @@ class DeviceAttributes:
     place_id: str | None
 
     # Extended fields from the IoT API discovery response.
-    # All default to None for backward compatibility with the legacy API path.
     dvc_brand_cd: str | None = None
     dvc_type_cd: str | None = None
-    prod_name: str | None = None
     prod_name_full: str | None = None
     order_no: str | None = None
     sell_type_cd: str | None = None
@@ -62,7 +60,6 @@ class CowayPurifier:
     network_status: bool | None
     is_on: bool | None
     auto_mode: bool | None
-    auto_eco_mode: bool | None
     eco_mode: bool | None
     night_mode: bool | None
     rapid_mode: bool | None

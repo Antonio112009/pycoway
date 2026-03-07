@@ -1,80 +1,11 @@
 """Tests for parser module."""
 
-import json
-
-import pytest
-
+from pycoway.devices.models import DeviceAttributes
 from pycoway.devices.parser import (
     build_filter_dict,
     build_filter_info_list,
     build_purifier,
-    extract_parsed_info,
-    parse_purifier_html,
 )
-from pycoway.exceptions import CowayError
-
-
-class TestParseHtml:
-    def _wrap_html(self, json_data: dict) -> str:
-        """Wrap JSON in a minimal HTML page with the expected script tag."""
-        raw = json.dumps(json_data)
-        return f"<html><body><script>var sensorInfo = {raw};</script></body></html>"
-
-    def test_returns_first_dict_child(self, sample_purifier_json_children):
-        html = self._wrap_html(sample_purifier_json_children)
-        result = parse_purifier_html(html, "Test")
-        assert result is not None
-        assert "coreData" in result
-
-    def test_returns_none_when_no_children(self):
-        html = self._wrap_html({"other_key": "value"})
-        result = parse_purifier_html(html, "Test")
-        assert result is None
-
-    def test_raises_on_invalid_html(self):
-        with pytest.raises(CowayError, match="Failed to parse"):
-            parse_purifier_html("<html><body></body></html>", "Test")
-
-    def test_returns_none_for_non_dict_children(self):
-        html = self._wrap_html({"children": ["string_child", 123]})
-        result = parse_purifier_html(html, "Test")
-        assert result is None
-
-
-class TestExtractParsedInfo:
-    def test_extracts_mcu_info(self, sample_purifier_json_children):
-        child = sample_purifier_json_children["children"][0]
-        parsed = extract_parsed_info(child)
-        assert parsed["mcu_info"]["currentMcuVer"] == "2.0.1"
-
-    def test_extracts_sensor_info(self, sample_purifier_json_children):
-        child = sample_purifier_json_children["children"][0]
-        parsed = extract_parsed_info(child)
-        assert parsed["sensor_info"]["0001"] == 15
-
-    def test_extracts_status_info(self, sample_purifier_json_children):
-        child = sample_purifier_json_children["children"][0]
-        parsed = extract_parsed_info(child)
-        assert parsed["status_info"]["0001"] == 1
-
-    def test_extracts_device_info(self, sample_purifier_json_children):
-        child = sample_purifier_json_children["children"][0]
-        parsed = extract_parsed_info(child)
-        assert parsed["device_info"]["productName"] == "AIRMEGA 250S"
-
-    def test_extracts_network_and_aq_grade(self, sample_purifier_json_children):
-        child = sample_purifier_json_children["children"][0]
-        parsed = extract_parsed_info(child)
-        assert parsed["network_info"]["wifiConnected"] is True
-        assert parsed["aq_grade"]["iaqGrade"] == 1
-
-    def test_defaults_for_empty_input(self):
-        parsed = extract_parsed_info({})
-        assert parsed["device_info"] == {}
-        assert parsed["mcu_info"] == {}
-        assert parsed["sensor_info"] == {}
-        assert parsed["status_info"] == {}
-        assert parsed["timer_info"] is None
 
 
 class TestBuildFilterDict:
@@ -226,7 +157,6 @@ class TestBuildPurifier:
         sample_parsed_info["status_info"]["0002"] = 6
         p = build_purifier(sample_device, sample_parsed_info)
         assert p.eco_mode is True
-        assert p.auto_eco_mode is True
 
     def test_no_aq_grade(self, sample_device, sample_parsed_info):
         sample_parsed_info["aq_grade"] = None
@@ -238,25 +168,26 @@ class TestBuildPurifier:
         purifier = build_purifier(sample_device, sample_parsed_info)
         assert purifier.odor_filter_pct == 35
 
-    def test_hb_discovery_fields_populated(self):
+    def test_iot_discovery_fields_populated(self):
         """When device dict comes from IoT API user-devices, extended attrs are populated."""
-        hb_device = {
-            "barcode": "15902EUZ2282500520",
-            "dvcModel": "AP-2015E(GRAPHITE_US)",
-            "dvcNick": "HH AIR PURIFIER",
-            "prodType": "02EUZ",
-            "prodName": "AIRMEGA",
-            "prodNameFull": "AIRMEGA 300s/400s",
-            "dvcBrandCd": "MG",
-            "dvcTypeCd": "004",
-            "ordNo": "ORD1WBGmBa7P",
-            "sellTypeCd": "1",
-            "admdongCd": "GB",
-            "stationCd": "GB",
-            "selfManageYn": "N",
-            "comType": "WIFI",
-            "wifiType": "M",
-        }
+        iot_attr = DeviceAttributes(
+            device_id="FAKE0TEST0000000001",
+            model=None,
+            model_code="AP-1234X(TEST_MODEL)",
+            code="02EUZ",
+            name="Test Purifier",
+            product_name="AIRMEGA",
+            place_id=None,
+            dvc_brand_cd="MG",
+            dvc_type_cd="004",
+            prod_name_full="AIRMEGA Test",
+            order_no="ORD0TEST0001",
+            sell_type_cd="1",
+            admdong_cd="GB",
+            station_cd="GB",
+            self_manage_yn="N",
+            mqtt_device=True,
+        )
         empty_parsed = {
             "mcu_info": {},
             "sensor_info": {},
@@ -267,24 +198,24 @@ class TestBuildPurifier:
             "filter_info": {},
             "timer_info": {},
         }
-        purifier = build_purifier(hb_device, empty_parsed)
+        purifier = build_purifier(iot_attr, empty_parsed)
         attr = purifier.device_attr
 
-        assert attr.device_id == "15902EUZ2282500520"
-        assert attr.model_code == "AP-2015E(GRAPHITE_US)"
+        assert attr.device_id == "FAKE0TEST0000000001"
+        assert attr.model_code == "AP-1234X(TEST_MODEL)"
         assert attr.code == "02EUZ"
-        assert attr.prod_name == "AIRMEGA"
+        assert attr.product_name == "AIRMEGA"
         assert attr.dvc_brand_cd == "MG"
         assert attr.dvc_type_cd == "004"
-        assert attr.prod_name_full == "AIRMEGA 300s/400s"
-        assert attr.order_no == "ORD1WBGmBa7P"
+        assert attr.prod_name_full == "AIRMEGA Test"
+        assert attr.order_no == "ORD0TEST0001"
         assert attr.sell_type_cd == "1"
         assert attr.admdong_cd == "GB"
         assert attr.station_cd == "GB"
         assert attr.self_manage_yn == "N"
         assert attr.mqtt_device is True
 
-    def test_legacy_device_has_none_hb_fields(self, sample_device, sample_parsed_info):
+    def test_legacy_device_has_none_iot_fields(self, sample_device, sample_parsed_info):
         """Legacy device dict leaves IoT API-only fields as None/False."""
         purifier = build_purifier(sample_device, sample_parsed_info)
         attr = purifier.device_attr

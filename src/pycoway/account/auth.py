@@ -121,14 +121,7 @@ class CowayAuthClient(CowayHttpClient):
 
         if self.check_token:
             await self._check_token()
-        return {
-            "region": "NUS",
-            "content-type": "application/json",
-            "accept": "*/*",
-            "authorization": f"Bearer {self.access_token}",
-            "accept-language": Header.COWAY_LANGUAGE,
-            "user-agent": Header.COWAY_USER_AGENT,
-        }
+        return self._build_auth_header(region="NUS")
 
     # ------------------------------------------------------------------
     # Login flow
@@ -279,7 +272,7 @@ class CowayAuthClient(CowayHttpClient):
             "content-type": "application/json",
             "accept": "*/*",
             "accept-language": Header.COWAY_LANGUAGE,
-            "user-agent": Header.COWAY_USER_AGENT,
+            "user-agent": Header.USER_AGENT,
         }
         data = {"refreshToken": self.refresh_token}
         url = f"{Endpoint.BASE_URI}{Endpoint.TOKEN_REFRESH}"

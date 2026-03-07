@@ -68,7 +68,7 @@ class CowayMaintenanceClient(CowayAuthClient):
             "ostype": Header.SOURCE_PATH,
             "appVersion": Parameter.APP_VERSION,
             "region": "NUS",
-            "user-agent": Header.COWAY_USER_AGENT,
+            "user-agent": Header.USER_AGENT,
             "authorization": f"Bearer {self.access_token}",
         }
         params = {
@@ -110,7 +110,7 @@ class CowayMaintenanceClient(CowayAuthClient):
         headers = {
             "region": "NUS",
             "accept": "application/json, text/plain, */*",
-            "user-agent": Header.HTML_USER_AGENT,
+            "user-agent": Header.USER_AGENT,
             "authorization": f"Bearer {self.access_token}",
         }
         params = {"langCd": Header.ACCEPT_LANG}

@@ -48,7 +48,7 @@ class CowayHttpClient:
         url = f"{Endpoint.BASE_URI}{Endpoint.GET_TOKEN}"
         headers = {
             "content-type": Header.CONTENT_JSON,
-            "user-agent": Header.COWAY_USER_AGENT,
+            "user-agent": Header.USER_AGENT,
             "accept-language": Header.COWAY_LANGUAGE,
         }
         async with self._session.post(
@@ -69,37 +69,39 @@ class CowayHttpClient:
         ) as resp:
             return await self._response(resp)
 
+    def _build_auth_header(self, **extra: str) -> dict[str, str]:
+        """Build an authenticated header with optional extras."""
+
+        headers = {
+            "Content-Type": Header.CONTENT_JSON,
+            "Accept": "*/*",
+            "accept-language": Header.COWAY_LANGUAGE,
+            "User-Agent": Header.USER_AGENT,
+            "authorization": f"Bearer {self.access_token}",
+        }
+        headers.update(extra)
+        return headers
+
     def _construct_control_header(self) -> dict[str, str]:
         """Build header for purifier control commands."""
+        return self._build_auth_header(region="NUS")
 
-        return {
-            "Content-Type": Header.CONTENT_JSON,
-            "Accept": "*/*",
-            "accept-language": Header.COWAY_LANGUAGE,
-            "User-Agent": Header.COWAY_USER_AGENT,
-            "authorization": f"Bearer {self.access_token}",
-            "region": "NUS",
-        }
-
-    def _construct_hb_header(self) -> dict[str, str]:
+    def _construct_iot_header(self, trcode: str = "") -> dict[str, str]:
         """Build header for the IoT JSON API calls."""
+        headers = self._build_auth_header(profile="prod")
+        if trcode:
+            headers["trcode"] = trcode
+        return headers
 
-        return {
-            "Content-Type": Header.CONTENT_JSON,
-            "Accept": "*/*",
-            "accept-language": Header.COWAY_LANGUAGE,
-            "User-Agent": Header.COWAY_USER_AGENT,
-            "authorization": f"Bearer {self.access_token}",
-        }
-
-    async def _get_hb_endpoint(
+    async def _get_iot_endpoint(
         self,
         endpoint: str,
         params: dict[str, Any] | None = None,
+        trcode: str = "",
     ) -> dict[str, Any]:
         """GET an IoT JSON API endpoint."""
 
-        headers = self._construct_hb_header()
+        headers = self._construct_iot_header(trcode)
         async with self._session.get(
             endpoint, headers=headers, params=params, timeout=self.timeout
         ) as resp:
@@ -121,7 +123,7 @@ class CowayHttpClient:
             "accesstoken": self.access_token,
             "accept-language": Header.COWAY_LANGUAGE,
             "region": "NUS",
-            "user-agent": Header.HTML_USER_AGENT,
+            "user-agent": Header.USER_AGENT,
             "srcpath": Header.SOURCE_PATH,
             "deviceserial": serial,
         }

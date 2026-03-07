@@ -87,7 +87,6 @@ class TestDeviceAttributes:
         # Extended fields default to None/False
         assert attr.dvc_brand_cd is None
         assert attr.dvc_type_cd is None
-        assert attr.prod_name is None
         assert attr.prod_name_full is None
         assert attr.order_no is None
         assert attr.sell_type_cd is None
@@ -109,20 +108,19 @@ class TestDeviceAttributes:
         assert attr.device_id is None
         assert attr.name is None
 
-    def test_hb_extended_fields(self):
+    def test_iot_extended_fields(self):
         attr = DeviceAttributes(
-            device_id="15902EUZ2282500520",
-            model="AP-2015E(GRAPHITE_US)",
-            model_code="AP-2015E",
+            device_id="FAKE0TEST0000000001",
+            model="AP-1234X(TEST_MODEL)",
+            model_code="AP-1234X",
             code="02EUZ",
-            name="HH AIR PURIFIER",
+            name="Test Purifier",
             product_name="AIRMEGA",
             place_id=None,
             dvc_brand_cd="MG",
             dvc_type_cd="004",
-            prod_name="AIRMEGA",
-            prod_name_full="AIRMEGA 300s/400s",
-            order_no="ORD1WBGmBa7P",
+            prod_name_full="AIRMEGA Test",
+            order_no="ORD0TEST0001",
             sell_type_cd="1",
             admdong_cd="GB",
             station_cd="GB",
@@ -131,9 +129,8 @@ class TestDeviceAttributes:
         )
         assert attr.dvc_brand_cd == "MG"
         assert attr.dvc_type_cd == "004"
-        assert attr.prod_name == "AIRMEGA"
-        assert attr.prod_name_full == "AIRMEGA 300s/400s"
-        assert attr.order_no == "ORD1WBGmBa7P"
+        assert attr.prod_name_full == "AIRMEGA Test"
+        assert attr.order_no == "ORD0TEST0001"
         assert attr.sell_type_cd == "1"
         assert attr.admdong_cd == "GB"
         assert attr.station_cd == "GB"
@@ -155,7 +152,6 @@ class TestCowayPurifier:
             network_status=True,
             is_on=True,
             auto_mode=True,
-            auto_eco_mode=False,
             eco_mode=False,
             night_mode=False,
             rapid_mode=False,
@@ -194,7 +190,6 @@ class TestPurifierData:
             network_status=None,
             is_on=None,
             auto_mode=None,
-            auto_eco_mode=None,
             eco_mode=None,
             night_mode=None,
             rapid_mode=None,

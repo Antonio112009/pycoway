@@ -1,11 +1,13 @@
-"""Parsing logic for building CowayPurifier objects from raw API/HTML data."""
+"""Parsing logic for building CowayPurifier objects from raw API data."""
 
+import contextlib
 import json
 import logging
 from typing import Any
 
 from bs4 import BeautifulSoup
 
+from pycoway.constants import IAQ_FIELD_MAP, CommandCode, SensorCode, SensorKey
 from pycoway.devices.models import CowayPurifier, DeviceAttributes, FilterInfo
 from pycoway.exceptions import CowayError
 
@@ -43,49 +45,28 @@ def parse_purifier_html(html: str, nick_name: str) -> dict[str, Any] | None:
     return None
 
 
-def extract_parsed_info(purifier_info: dict[str, Any]) -> dict[str, Any]:
-    """Pull structured sections out of the raw purifier info dict."""
+def extract_html_supplements(purifier_info: dict[str, Any]) -> dict[str, Any]:
+    """Extract MCU version and lux sensor from HTML-parsed purifier data.
 
-    parsed: dict[str, Any] = {
-        "device_info": {},
-        "mcu_info": {},
-        "network_info": {},
-        "sensor_info": {},
-        "status_info": {},
-        "aq_grade": {},
-        "filter_info": {},
-        "timer_info": None,
-    }
+    These two data points are only available from the legacy HTML page
+    scrape and not from the IoT JSON API.
+    """
+
+    mcu_version: str | None = None
+    lux: int | None = None
 
     for data in purifier_info.get("coreData", []):
         inner = data.get("data", {})
         if "currentMcuVer" in inner:
-            parsed["mcu_info"] = inner
+            mcu_version = inner["currentMcuVer"]
         if "sensorInfo" in inner:
-            parsed["sensor_info"] = inner["sensorInfo"].get("attributes", {})
+            attrs = inner["sensorInfo"].get("attributes", {})
+            raw_lux = attrs.get(SensorCode.LUX)
+            if raw_lux is not None:
+                with contextlib.suppress(ValueError, TypeError):
+                    lux = int(raw_lux)
 
-    if "deviceStatusData" in purifier_info:
-        parsed["status_info"] = (
-            purifier_info["deviceStatusData"]
-            .get("data", {})
-            .get("statusInfo", {})
-            .get("attributes", {})
-        )
-
-    if "baseInfoForModelCodeData" in purifier_info:
-        parsed["device_info"] = purifier_info["baseInfoForModelCodeData"].get("deviceInfo", {})
-
-    if "deviceModule" in purifier_info:
-        module_detail = (
-            purifier_info["deviceModule"]
-            .get("data", {})
-            .get("content", {})
-            .get("deviceModuleDetailInfo", {})
-        )
-        parsed["network_info"] = module_detail
-        parsed["aq_grade"] = module_detail.get("airStatusInfo")
-
-    return parsed
+    return {"mcu_version": mcu_version, "lux": lux}
 
 
 def build_filter_dict(filter_info: list[dict[str, Any]]) -> dict[str, Any]:
@@ -147,7 +128,7 @@ def _sensor_filter_pct(sensor_info: dict[str, Any], key: str) -> int | None:
 
 
 def build_purifier(
-    dev: dict[str, Any],
+    device_attr: DeviceAttributes,
     parsed_info: dict[str, Any],
     raw_filters: list[dict[str, Any]] | None = None,
 ) -> CowayPurifier:
@@ -158,25 +139,11 @@ def build_purifier(
     sensor = parsed_info["sensor_info"]
     filters = parsed_info["filter_info"]
 
-    device_attr = DeviceAttributes(
-        device_id=dev.get("deviceSerial") or dev.get("barcode"),
-        model=device_info.get("productName"),
-        model_code=dev.get("productModel") or dev.get("dvcModel"),
-        code=device_info.get("modelCode") or dev.get("prodType"),
-        name=dev.get("dvcNick"),
-        product_name=device_info.get("prodName") or dev.get("prodName"),
-        place_id=dev.get("placeId"),
-        dvc_brand_cd=dev.get("dvcBrandCd"),
-        dvc_type_cd=dev.get("dvcTypeCd"),
-        prod_name=dev.get("prodName"),
-        prod_name_full=dev.get("prodNameFull"),
-        order_no=dev.get("ordNo"),
-        sell_type_cd=dev.get("sellTypeCd"),
-        admdong_cd=dev.get("admdongCd"),
-        station_cd=dev.get("stationCd"),
-        self_manage_yn=dev.get("selfManageYn"),
-        mqtt_device=dev.get("comType") == "WIFI" or dev.get("wifiType") is not None,
-    )
+    # Enrich DeviceAttributes with fields from device_info if available.
+    if device_info:
+        device_attr.model = device_info.get("productName") or device_attr.model
+        device_attr.code = device_info.get("modelCode") or device_attr.code
+        device_attr.product_name = device_info.get("prodName") or device_attr.product_name
 
     network_status = parsed_info["network_info"].get("wifiConnected")
     if not network_status and network_status is not None:
@@ -188,27 +155,27 @@ def build_purifier(
             pre_filter_pct = filters["pre-filter"].get("filterRemain")
             pre_filter_change_frequency = filters["pre-filter"].get("replaceCycle")
         else:
-            pre_filter_pct = _sensor_filter_pct(sensor, "0011")
+            pre_filter_pct = _sensor_filter_pct(sensor, SensorCode.PRE_FILTER_USAGE)
             pre_filter_change_frequency = None
         max2_pct = (
             filters["max2"].get("filterRemain")
             if "max2" in filters
-            else _sensor_filter_pct(sensor, "0012")
+            else _sensor_filter_pct(sensor, SensorCode.MAX2_FILTER_USAGE)
         )
     else:
-        pre_filter_pct = _sensor_filter_pct(sensor, "0011")
-        max2_pct = _sensor_filter_pct(sensor, "0012")
+        pre_filter_pct = _sensor_filter_pct(sensor, SensorCode.PRE_FILTER_USAGE)
+        max2_pct = _sensor_filter_pct(sensor, SensorCode.MAX2_FILTER_USAGE)
         pre_filter_change_frequency = None
 
     odor_filter = (
         filters["odor-filter"].get("filterRemain")
         if "odor-filter" in filters
-        else _sensor_filter_pct(sensor, "0013")
+        else _sensor_filter_pct(sensor, SensorCode.ODOR_FILTER_USAGE)
     )
 
     # Air quality readings
-    pm_2_5 = sensor.get("0001", sensor.get("PM25_IDX"))
-    pm_10 = sensor.get("0002", sensor.get("PM10_IDX"))
+    pm_2_5 = sensor.get(SensorCode.PM25, sensor.get(SensorKey.PM25))
+    pm_10 = sensor.get(SensorCode.PM10, sensor.get(SensorKey.PM10))
 
     mode_value = status.get("0002")
 
@@ -218,7 +185,6 @@ def build_purifier(
         network_status=network_status,
         is_on=status.get("0001") == 1,
         auto_mode=mode_value == 1,
-        auto_eco_mode=mode_value == 6,
         eco_mode=mode_value == 6,
         night_mode=mode_value == 2,
         rapid_mode=mode_value == 5,
@@ -234,63 +200,101 @@ def build_purifier(
         aq_grade=parsed_info["aq_grade"].get("iaqGrade") if parsed_info["aq_grade"] else None,
         particulate_matter_2_5=pm_2_5,
         particulate_matter_10=pm_10,
-        carbon_dioxide=sensor.get("CO2_IDX"),
-        volatile_organic_compounds=sensor.get("VOCs_IDX"),
-        air_quality_index=sensor.get("IAQ"),
-        lux_sensor=sensor.get("0007"),
+        carbon_dioxide=sensor.get(SensorKey.CO2),
+        volatile_organic_compounds=sensor.get(SensorKey.VOCS),
+        air_quality_index=sensor.get(SensorKey.IAQ),
+        lux_sensor=sensor.get(SensorCode.LUX),
         pre_filter_change_frequency=pre_filter_change_frequency,
         smart_mode_sensitivity=status.get("000A"),
         filters=build_filter_info_list(raw_filters) if raw_filters else None,
     )
 
 
-def extract_hb_parsed_info(
+def _safe_int(value: Any) -> int | None:
+    """Convert a value to int if possible, otherwise return None."""
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def extract_iot_parsed_info(
     control_data: dict[str, Any],
     air_data: dict[str, Any],
     conn_data: dict[str, Any],
 ) -> dict[str, Any]:
     """Build the same parsed-info dict from IoT JSON API responses.
 
-    ``control_data`` comes from the control-status endpoint,
-    ``air_data`` from the air/home endpoint, and ``conn_data`` from
-    the devices-conn endpoint.  The returned dict has the same shape as
+    ``control_data`` comes from the control-status endpoint (``data``
+    contains ``controlStatus``, ``netStatus``, etc.),
+    ``air_data`` from the air/home endpoint (``data`` contains ``IAQ``,
+    ``prodStatus``, ``filterList``, etc.), and ``conn_data`` from the
+    devices-conn endpoint.  The returned dict has the same shape as
     :func:`extract_parsed_info` so :func:`build_purifier` can consume
     it unchanged.
     """
 
-    # control-status → statusInfo.attributes  (same keys as HTML path)
-    control_status = control_data.get("controlStatusData", {})
-    status_attrs = control_status.get("data", {}).get("statusInfo", {}).get("attributes", {})
+    # --- Control status (hex-coded keys, string values → int) ----------
+    raw_status = control_data.get("controlStatus", {})
+    status_attrs: dict[str, Any] = {}
+    for k, v in raw_status.items():
+        converted = _safe_int(v)
+        status_attrs[k] = converted if converted is not None else v
 
-    # control-status may also carry coreData / MCU info
-    mcu_info: dict[str, Any] = {}
-    for core in control_status.get("coreData", []):
-        inner = core.get("data", {})
-        if "currentMcuVer" in inner:
-            mcu_info = inner
-            break
-
-    # air/home → sensor readings and AQ grade
-    air_quality = air_data.get("airHomeData", {})
+    # --- IAQ sensor readings → internal sensor keys --------------------
+    iaq = air_data.get("IAQ", {})
     sensor_info: dict[str, Any] = {}
-    aq_grade: dict[str, Any] | None = None
-    if air_quality:
-        sensor_info = air_quality.get("sensorInfo", {}).get("attributes", {})
-        iaq = air_quality.get("iaqGrade")
-        aq_grade = {"iaqGrade": iaq} if iaq is not None else {}
+    for iaq_field, sensor_key in IAQ_FIELD_MAP.items():
+        value = iaq.get(iaq_field)
+        converted = _safe_int(value)
+        if converted is not None:
+            sensor_info[sensor_key] = converted
 
-    # devices-conn → connection/network status
+    # --- AQ grade from prodStatus.dustPollution -----------------------
+    prod_status = air_data.get("prodStatus", {})
+    dust_pollution = _safe_int(prod_status.get("dustPollution"))
+    aq_grade: dict[str, Any] | None = (
+        {"iaqGrade": dust_pollution} if dust_pollution is not None else {}
+    )
+
+    # --- Network status (available in control, air, and conn) ---------
+    net_status = control_data.get("netStatus")
+    if net_status is None:
+        net_status = air_data.get("netStatus")
+    if net_status is None and conn_data:
+        net_status = conn_data.get("netStatus") == "online"
     network_info: dict[str, Any] = {}
-    if conn_data:
-        network_info = {"wifiConnected": conn_data.get("netStatus") == "online"}
+    if net_status is not None:
+        network_info = {"wifiConnected": bool(net_status)}
+
+    # --- Filters from air/home filterList -----------------------------
+    filter_info: dict[str, Any] = {}
+    for f in air_data.get("filterList", []):
+        name = (f.get("filterName") or "").casefold()
+        pct = f.get("filterPer")
+        cycle = _safe_int(f.get("changeCycle"))
+        if "프리필터" in name or "pre" in name:
+            entry: dict[str, Any] = {"filterRemain": pct}
+            if cycle is not None:
+                entry["replaceCycle"] = cycle
+            filter_info["pre-filter"] = entry
+        elif "max2" in name:
+            filter_info["max2"] = {"filterRemain": pct}
+        elif any(kw in name for kw in ("탈취", "odor", "deodor")):
+            filter_info["odor-filter"] = {"filterRemain": pct}
+
+    # --- Timer --------------------------------------------------------
+    timer_value = _safe_int(raw_status.get("offTimer", raw_status.get(CommandCode.TIMER)))
 
     return {
         "device_info": {},
-        "mcu_info": mcu_info,
+        "mcu_info": {},
         "network_info": network_info,
         "sensor_info": sensor_info,
         "status_info": status_attrs,
         "aq_grade": aq_grade,
-        "filter_info": {},
-        "timer_info": status_attrs.get("0008"),
+        "filter_info": filter_info,
+        "timer_info": timer_value,
     }
