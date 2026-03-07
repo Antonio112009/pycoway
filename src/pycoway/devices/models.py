@@ -1,6 +1,6 @@
 """Data classes for Coway IoCare Purifiers."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -14,6 +14,19 @@ class DeviceAttributes:
     name: str | None
     product_name: str | None
     place_id: str | None
+
+    # Extended fields from the HB (homebridge-style) API discovery response.
+    # All default to None for backward compatibility with the legacy API path.
+    dvc_brand_cd: str | None = None
+    dvc_type_cd: str | None = None
+    prod_name: str | None = None
+    prod_name_full: str | None = None
+    order_no: str | None = None
+    sell_type_cd: str | None = None
+    admdong_cd: str | None = None
+    station_cd: str | None = None
+    self_manage_yn: str | None = None
+    mqtt_device: bool = field(default=False)
 
 
 @dataclass

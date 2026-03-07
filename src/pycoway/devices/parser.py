@@ -159,13 +159,23 @@ def build_purifier(
     filters = parsed_info["filter_info"]
 
     device_attr = DeviceAttributes(
-        device_id=dev.get("deviceSerial"),
+        device_id=dev.get("deviceSerial") or dev.get("barcode"),
         model=device_info.get("productName"),
-        model_code=dev.get("productModel"),
-        code=device_info.get("modelCode"),
+        model_code=dev.get("productModel") or dev.get("dvcModel"),
+        code=device_info.get("modelCode") or dev.get("prodType"),
         name=dev.get("dvcNick"),
-        product_name=device_info.get("prodName"),
+        product_name=device_info.get("prodName") or dev.get("prodName"),
         place_id=dev.get("placeId"),
+        dvc_brand_cd=dev.get("dvcBrandCd"),
+        dvc_type_cd=dev.get("dvcTypeCd"),
+        prod_name=dev.get("prodName"),
+        prod_name_full=dev.get("prodNameFull"),
+        order_no=dev.get("ordNo"),
+        sell_type_cd=dev.get("sellTypeCd"),
+        admdong_cd=dev.get("admdongCd"),
+        station_cd=dev.get("stationCd"),
+        self_manage_yn=dev.get("selfManageYn"),
+        mqtt_device=dev.get("comType") == "WIFI" or dev.get("wifiType") is not None,
     )
 
     network_status = parsed_info["network_info"].get("wifiConnected")

@@ -237,3 +237,59 @@ class TestBuildPurifier:
         sample_parsed_info["filter_info"]["odor-filter"] = {"filterRemain": 35}
         purifier = build_purifier(sample_device, sample_parsed_info)
         assert purifier.odor_filter_pct == 35
+
+    def test_hb_discovery_fields_populated(self):
+        """When device dict comes from HB user-devices, extended attrs are populated."""
+        hb_device = {
+            "barcode": "15902EUZ2282500520",
+            "dvcModel": "AP-2015E(GRAPHITE_US)",
+            "dvcNick": "HH AIR PURIFIER",
+            "prodType": "02EUZ",
+            "prodName": "AIRMEGA",
+            "prodNameFull": "AIRMEGA 300s/400s",
+            "dvcBrandCd": "MG",
+            "dvcTypeCd": "004",
+            "ordNo": "ORD1WBGmBa7P",
+            "sellTypeCd": "1",
+            "admdongCd": "GB",
+            "stationCd": "GB",
+            "selfManageYn": "N",
+            "comType": "WIFI",
+            "wifiType": "M",
+        }
+        empty_parsed = {
+            "mcu_info": {},
+            "sensor_info": {},
+            "status_info": {},
+            "device_info": {},
+            "network_info": {},
+            "aq_grade": {},
+            "filter_info": {},
+            "timer_info": {},
+        }
+        purifier = build_purifier(hb_device, empty_parsed)
+        attr = purifier.device_attr
+
+        assert attr.device_id == "15902EUZ2282500520"
+        assert attr.model_code == "AP-2015E(GRAPHITE_US)"
+        assert attr.code == "02EUZ"
+        assert attr.prod_name == "AIRMEGA"
+        assert attr.dvc_brand_cd == "MG"
+        assert attr.dvc_type_cd == "004"
+        assert attr.prod_name_full == "AIRMEGA 300s/400s"
+        assert attr.order_no == "ORD1WBGmBa7P"
+        assert attr.sell_type_cd == "1"
+        assert attr.admdong_cd == "GB"
+        assert attr.station_cd == "GB"
+        assert attr.self_manage_yn == "N"
+        assert attr.mqtt_device is True
+
+    def test_legacy_device_has_none_hb_fields(self, sample_device, sample_parsed_info):
+        """Legacy device dict leaves HB-only fields as None/False."""
+        purifier = build_purifier(sample_device, sample_parsed_info)
+        attr = purifier.device_attr
+
+        assert attr.dvc_brand_cd is None
+        assert attr.dvc_type_cd is None
+        assert attr.order_no is None
+        assert attr.mqtt_device is False

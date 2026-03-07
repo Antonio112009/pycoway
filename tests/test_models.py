@@ -84,6 +84,17 @@ class TestDeviceAttributes:
         assert attr.name == "Living Room"
         assert attr.product_name == "Airmega 250S"
         assert attr.place_id == "P1"
+        # Extended fields default to None/False
+        assert attr.dvc_brand_cd is None
+        assert attr.dvc_type_cd is None
+        assert attr.prod_name is None
+        assert attr.prod_name_full is None
+        assert attr.order_no is None
+        assert attr.sell_type_cd is None
+        assert attr.admdong_cd is None
+        assert attr.station_cd is None
+        assert attr.self_manage_yn is None
+        assert attr.mqtt_device is False
 
     def test_none_fields(self):
         attr = DeviceAttributes(
@@ -97,6 +108,37 @@ class TestDeviceAttributes:
         )
         assert attr.device_id is None
         assert attr.name is None
+
+    def test_hb_extended_fields(self):
+        attr = DeviceAttributes(
+            device_id="15902EUZ2282500520",
+            model="AP-2015E(GRAPHITE_US)",
+            model_code="AP-2015E",
+            code="02EUZ",
+            name="HH AIR PURIFIER",
+            product_name="AIRMEGA",
+            place_id=None,
+            dvc_brand_cd="MG",
+            dvc_type_cd="004",
+            prod_name="AIRMEGA",
+            prod_name_full="AIRMEGA 300s/400s",
+            order_no="ORD1WBGmBa7P",
+            sell_type_cd="1",
+            admdong_cd="GB",
+            station_cd="GB",
+            self_manage_yn="N",
+            mqtt_device=True,
+        )
+        assert attr.dvc_brand_cd == "MG"
+        assert attr.dvc_type_cd == "004"
+        assert attr.prod_name == "AIRMEGA"
+        assert attr.prod_name_full == "AIRMEGA 300s/400s"
+        assert attr.order_no == "ORD1WBGmBa7P"
+        assert attr.sell_type_cd == "1"
+        assert attr.admdong_cd == "GB"
+        assert attr.station_cd == "GB"
+        assert attr.self_manage_yn == "N"
+        assert attr.mqtt_device is True
 
     def test_equality(self):
         a = DeviceAttributes("D1", "M", "MC", "C", "N", "P", "PL")
