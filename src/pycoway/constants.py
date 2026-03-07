@@ -57,6 +57,14 @@ class Endpoint(StrEnum):
     PURIFIER_HTML_BASE = "https://iocare2.coway.com/en"
     SECONDARY_BASE = "https://iocare2.coway.com/api/proxy/api/v1"
 
+    # Homebridge-style JSON API (no HTML scraping needed)
+    HB_BASE_URI = "https://iocareapi.iot.coway.com/api/v1"
+    HB_USER_DEVICES = "/com/user-devices"
+    HB_DEVICE_CONTROL = "/com/devices"  # /{id}/control
+    HB_DEVICE_CONN = "/com/devices-conn"
+    HB_AIR_HOME = "/air/devices"  # /{id}/home
+    HB_AIR_FILTER_INFO = "/air/devices"  # /{id}/filter-info
+
 
 class Parameter(StrEnum):
     APP_VERSION = "2.15.0"

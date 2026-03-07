@@ -81,6 +81,30 @@ class CowayHttpClient:
             "region": "NUS",
         }
 
+    def _construct_hb_header(self) -> dict[str, str]:
+        """Build header for HB (homebridge-style) JSON API calls."""
+
+        return {
+            "Content-Type": Header.CONTENT_JSON,
+            "Accept": "*/*",
+            "accept-language": Header.COWAY_LANGUAGE,
+            "User-Agent": Header.COWAY_USER_AGENT,
+            "authorization": f"Bearer {self.access_token}",
+        }
+
+    async def _get_hb_endpoint(
+        self,
+        endpoint: str,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """GET a homebridge-style JSON API endpoint."""
+
+        headers = self._construct_hb_header()
+        async with self._session.get(
+            endpoint, headers=headers, params=params, timeout=self.timeout
+        ) as resp:
+            return await self._response(resp)
+
     async def _get_purifier_html(
         self, nick_name: str, serial: str, model_code: str, place_id: str
     ) -> str:
