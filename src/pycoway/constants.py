@@ -121,6 +121,18 @@ class CommandCode(StrEnum):
     TIMER = "0008"
     SMART_SENSITIVITY = "000A"
     BUTTON_LOCK = "0024"
+
+
+class ParamCode(StrEnum):
+    """Attribute codes used by the control-param endpoint.
+
+    Kept in a separate enum from :class:`CommandCode` because the wire
+    value happens to overlap with ``CommandCode.POWER`` even though it
+    targets a different endpoint with a different meaning. Combining
+    them in one enum would make ``StrEnum`` treat the second member as
+    an alias of the first.
+    """
+
     PREFILTER = "0001"
 
 

@@ -9,6 +9,7 @@ from pycoway.constants import (
     CommandCode,
     Endpoint,
     LightMode,
+    ParamCode,
 )
 from pycoway.devices.data import CowayDataClient
 from pycoway.devices.models import DeviceAttributes
@@ -154,7 +155,7 @@ class CowayControlClient(CowayDataClient):
             )
         cycle = PREFILTER_CYCLE[value]
         data = {
-            "attributes": {CommandCode.PREFILTER: cycle},
+            "attributes": {ParamCode.PREFILTER: cycle},
             "deviceSerial": device_attr.device_id,
             "placeId": str(device_attr.place_id),
             "refreshFlag": False,

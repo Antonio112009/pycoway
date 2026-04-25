@@ -4,6 +4,8 @@ import json
 import logging
 from typing import Any
 
+from aiohttp import ClientError
+
 from pycoway.account.maintenance import CowayMaintenanceClient
 from pycoway.constants import (
     CATEGORY_NAME,
@@ -158,8 +160,8 @@ class CowayDataClient(CowayMaintenanceClient):
                             parsed_info["mcu_info"] = {"currentMcuVer": supplements["mcu_version"]}
                         if supplements["lux"] is not None:
                             parsed_info["sensor_info"][SensorCode.LUX] = supplements["lux"]
-                except Exception:
-                    LOGGER.debug(f"HTML supplement fetch failed for {nick}, skipping MCU/lux")
+                except (ClientError, TimeoutError, CowayError):
+                    LOGGER.exception(f"HTML supplement fetch failed for {nick}, skipping MCU/lux")
 
                 # Rich filter data (dates, pollutants, descriptions) from legacy API.
                 LOGGER.debug(f"Fetching filter info for {nick}")

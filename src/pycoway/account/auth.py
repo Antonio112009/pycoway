@@ -69,8 +69,10 @@ class CowayAuthClient(CowayHttpClient):
             "redirect_uri": Endpoint.REDIRECT_URL,
             "ui_locales": "en",
         }
-        # Clear cookie jar so Coway returns the login form on subsequent logins.
-        self._session.cookie_jar.clear()
+        # Clear only Coway/keycloak cookies so we don't wipe unrelated cookies
+        # when the caller passed in a shared ClientSession.
+        for domain in ("id.coway.com", "iocare.iotsvc.coway.com", "iocareapi.iot.coway.com"):
+            self._session.cookie_jar.clear_domain(domain)
         LOGGER.debug(f"Sending request to endpoint {url}")
         async with self._session.get(
             url, headers=headers, params=params, timeout=self.timeout
@@ -104,8 +106,13 @@ class CowayAuthClient(CowayHttpClient):
 
             if page_title == "Coway - Password change message":
                 if self.skip_password_change:
-                    form_url = soup.find("form", id="kc-password-change-form").get("action")
-                    return form_url, True
+                    form = soup.find("form", id="kc-password-change-form")
+                    if form is None or not form.get("action"):
+                        raise CowayError(
+                            "Coway servers returned the password change page but no "
+                            "'kc-password-change-form' form was found to skip it."
+                        )
+                    return form.get("action"), True
                 raise PasswordExpired(
                     "Coway servers are requesting a password change as the "
                     "password on this account hasn't been changed for 60 days or more."
@@ -200,7 +207,15 @@ class CowayAuthClient(CowayHttpClient):
             )
             LOGGER.debug(f"Auth code skip password response: {response}")
 
-        return response.url.query_string.partition("code=")[-1]
+        query_string = response.url.query_string
+        prefix, sep, code = query_string.partition("code=")
+        if not sep or not code:
+            raise AuthError(
+                "Coway authentication did not return an auth code. "
+                "This usually means the credentials were rejected silently "
+                "or the OAuth flow changed."
+            )
+        return code
 
     async def _get_token(self, auth_code: str) -> tuple[str, str]:
         """Exchange auth code for access + refresh tokens."""

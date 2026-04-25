@@ -120,7 +120,7 @@ class CowayHttpClient:
             "dvcnick": nick_name,
             "timezoneid": Parameter.TIMEZONE,
             "appversion": Parameter.APP_VERSION,
-            "accesstoken": self.access_token,
+            "accesstoken": self.access_token or "",
             "accept-language": Header.COWAY_LANGUAGE,
             "region": "NUS",
             "user-agent": Header.USER_AGENT,
