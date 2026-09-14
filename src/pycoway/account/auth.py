@@ -1,5 +1,6 @@
 """Authentication layer for Coway IoCare API."""
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
@@ -30,6 +31,7 @@ from pycoway.transport.http import CowayHttpClient
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_TOKEN_LIFETIME = 3600  # seconds, used when the API omits expiresIn
+TOKEN_REFRESH_MARGIN = 300  # seconds before expiry at which the token is refreshed
 
 
 def _token_lifetime(token_data: dict[str, Any]) -> int:
@@ -61,7 +63,13 @@ class CowayAuthClient(CowayHttpClient):
         self.token_expiration: datetime | None = None
         self.country_code: str | None = None
         self.places: list[dict[str, Any]] | None = None
+        # Set to False to disable the automatic refresh / re-login that
+        # normally runs before every authenticated request.
         self.check_token: bool = True
+        # Serialises login and token refresh so concurrent callers (a poll
+        # and a control command, say) share one refresh instead of each
+        # performing their own and tripping Coway's rate limiter.
+        self._token_lock = asyncio.Lock()
 
     # ------------------------------------------------------------------
     # OAuth / login helpers
@@ -88,7 +96,7 @@ class CowayAuthClient(CowayHttpClient):
         for domain in ("id.coway.com", "iocare.iotsvc.coway.com", "iocareapi.iot.coway.com"):
             session.cookie_jar.clear_domain(domain)
         LOGGER.debug(f"Sending request to endpoint {url}")
-        async with session.get(url, headers=headers, params=params, timeout=self.timeout) as resp:
+        async with self._request("get", url, headers=headers, params=params) as resp:
             html_page = await resp.text()
             return resp, html_page
 
@@ -101,9 +109,7 @@ class CowayAuthClient(CowayHttpClient):
     ) -> tuple[str | ClientResponse, bool]:
         """POST credentials / password-skip to the authentication endpoint."""
 
-        async with self._ensure_session().post(
-            url, cookies=cookies, headers=headers, data=data, timeout=self.timeout
-        ) as resp:
+        async with self._request("post", url, cookies=cookies, headers=headers, data=data) as resp:
             if resp.content_type != "text/html":
                 return resp, False
 
@@ -138,8 +144,7 @@ class CowayAuthClient(CowayHttpClient):
     async def _create_endpoint_header(self) -> dict[str, str]:
         """Build the common header for authorized endpoints."""
 
-        if self.check_token:
-            await self._check_token()
+        await self._check_token()
         return self._build_auth_header(region="NUS")
 
     # ------------------------------------------------------------------
@@ -148,6 +153,12 @@ class CowayAuthClient(CowayHttpClient):
 
     async def login(self) -> None:
         """Full login flow: cookies -> auth code -> tokens -> country -> places."""
+
+        async with self._token_lock:
+            await self._do_login()
+
+    async def _do_login(self) -> None:
+        """Run the login flow. The caller must hold ``_token_lock``."""
 
         login_url, cookies = await self._get_login_cookies()
         auth_code = await self._get_auth_code(login_url, cookies)
@@ -268,32 +279,46 @@ class CowayAuthClient(CowayHttpClient):
     # ------------------------------------------------------------------
 
     async def _check_token(self) -> None:
-        """Refresh or re-login if the token is missing or about to expire."""
+        """Refresh or re-login if the token is missing or about to expire.
+
+        Serialised through ``_token_lock``: concurrent callers wait for the
+        refresh (or login) already in flight and then reuse its result
+        instead of each starting their own.
+        """
 
         if not self.check_token:
             LOGGER.debug(f"Token check is set to False. Skipping for {self.username}")
             return
 
-        LOGGER.debug(f"Checking token for {self.username}")
+        async with self._token_lock:
+            LOGGER.debug(f"Checking token for {self.username}")
 
-        if any(v is None for v in [self.access_token, self.refresh_token, self.token_expiration]):
-            LOGGER.debug(
-                f"One of access_token, refresh_token, or token_expiration is None. "
-                f"Logging in for {self.username}"
-            )
-            await self.login()
-            return
+            if (
+                self.access_token is None
+                or self.refresh_token is None
+                or self.token_expiration is None
+            ):
+                LOGGER.debug(
+                    f"One of access_token, refresh_token, or token_expiration is None. "
+                    f"Logging in for {self.username}"
+                )
+                await self._do_login()
+                return
 
-        remaining = (self.token_expiration - datetime.now()).total_seconds()
-        if remaining < 300:
-            LOGGER.debug(
-                f"Access token expires at {self.token_expiration}. "
-                f"Refreshing token for {self.username}"
-            )
-            await self._refresh_token()
+            remaining = (self.token_expiration - datetime.now()).total_seconds()
+            if remaining < TOKEN_REFRESH_MARGIN:
+                LOGGER.debug(
+                    f"Access token expires at {self.token_expiration}. "
+                    f"Refreshing token for {self.username}"
+                )
+                await self._refresh_token()
 
     async def _refresh_token(self) -> None:
-        """Obtain a new access token using the refresh token."""
+        """Obtain a new access token using the refresh token.
+
+        Falls back to a full credential login when Coway rejects the
+        refresh token. The caller must hold ``_token_lock``.
+        """
 
         headers = {
             "content-type": "application/json",
@@ -305,17 +330,22 @@ class CowayAuthClient(CowayHttpClient):
         url = f"{Endpoint.BASE_URI}{Endpoint.TOKEN_REFRESH}"
 
         LOGGER.debug(f"Refreshing tokens for {self.username} at {url}")
-        async with self._ensure_session().post(
-            url, headers=headers, data=json.dumps(data), timeout=self.timeout
-        ) as resp:
-            response = await self._response(resp)
+        try:
+            async with self._request("post", url, headers=headers, data=json.dumps(data)) as resp:
+                response = await self._response(resp)
+        except AuthError as exc:
+            LOGGER.warning(
+                f"Token refresh rejected for {self.username}, falling back to full login: {exc}"
+            )
+            await self._do_login()
+            return
 
         if "error" in response:
             LOGGER.warning(
                 f"Token refresh failed for {self.username}, falling back to full login. "
                 f"Response: {response}"
             )
-            await self.login()
+            await self._do_login()
             return
 
         token_data = response.get("data") or {}
@@ -337,7 +367,9 @@ class CowayAuthClient(CowayHttpClient):
         """Fetch the country code associated with the account."""
 
         endpoint = f"{Endpoint.BASE_URI}{Endpoint.USER_INFO}"
-        headers = await self._create_endpoint_header()
+        # Part of the login flow, which runs with the token lock held and
+        # a freshly issued token: build the header without a token check.
+        headers = self._build_auth_header(region="NUS")
         LOGGER.debug(f"Getting country code for {self.username}")
         response = await self._get_endpoint(endpoint=endpoint, headers=headers, params=None)
 
@@ -378,7 +410,8 @@ class CowayAuthClient(CowayHttpClient):
             "pageSize": "20",
             "timezoneId": get_timezone(),
         }
-        headers = await self._create_endpoint_header()
+        # Same as _get_country_code: called from the login flow, no token check.
+        headers = self._build_auth_header(region="NUS")
         LOGGER.debug(f"Getting places for {self.username}")
         response = await self._get_endpoint(endpoint=endpoint, headers=headers, params=params)
 

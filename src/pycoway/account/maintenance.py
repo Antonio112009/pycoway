@@ -47,8 +47,7 @@ class CowayMaintenanceClient(CowayAuthClient):
     async def async_server_maintenance_notice(self) -> None:
         """Fetch the latest Coway server maintenance notice."""
 
-        if self.check_token:
-            await self._check_token()
+        await self._check_token()
 
         now = datetime.now()
 

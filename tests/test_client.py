@@ -53,6 +53,10 @@ class TestCowayClient:
         finally:
             await client.close()
 
+    async def test_context_manager_yields_the_concrete_client(self):
+        async with CowayClient("email@example.com", "password") as client:
+            assert type(client) is CowayClient
+
 
 class TestGetAuthCode:
     def _client_with_redirect(self, url: str) -> CowayAuthClient:
@@ -124,8 +128,8 @@ class TestCowayAuthClient:
         )
         client.refresh_token = "refresh-token"
         client._response = AsyncMock(return_value={"error": "expired"})
-        client.login = AsyncMock()
+        client._do_login = AsyncMock()
 
         await client._refresh_token()
 
-        client.login.assert_awaited_once()
+        client._do_login.assert_awaited_once()
