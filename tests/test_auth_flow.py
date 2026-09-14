@@ -9,6 +9,7 @@ import pytest
 from pycoway.account.auth import TOKEN_REFRESH_MARGIN, CowayAuthClient
 from pycoway.client import CowayClient
 from pycoway.constants import CATEGORY_NAME, Endpoint, ErrorMessages
+from pycoway.devices.models import DeviceAttributes
 from pycoway.exceptions import AuthError, CowayError, PasswordExpired
 from tests.fakes import (
     DEFAULT_PLACE,
@@ -270,3 +271,114 @@ class TestRefreshFallback:
 
         with pytest.raises(AuthError, match="Invalid username/password"):
             await client._check_token()
+
+
+class TestPollRacingControlCommand:
+    """A full poll and a control command racing through one token refresh.
+
+    This is the Home Assistant shape of the problem: the coordinator
+    polls while a service call sends a command, and the token happens to
+    be about to expire. Everything runs through the real client code
+    against the fake session, so it also proves the lock cannot deadlock
+    the two flows against each other.
+    """
+
+    DEVICE = {
+        "categoryName": CATEGORY_NAME,
+        "deviceSerial": "S1",
+        "dvcNick": "Bedroom",
+        "placeId": "p1",
+        "prodType": "02EUZ",
+    }
+
+    def _add_poll_routes(self, fake_session: FakeSession) -> None:
+        iot = Endpoint.IOT_BASE_URI
+        fake_session.add(
+            "get",
+            f"{PLACES_URL}/p1/devices",
+            FakeResponse(json_data={"data": {"content": [self.DEVICE]}}),
+        )
+        fake_session.add(
+            "get",
+            f"{iot}{Endpoint.IOT_USER_DEVICES}",
+            FakeResponse(
+                json_data={"data": {"deviceInfos": [{"barcode": "S1", "comType": "WIFI"}]}}
+            ),
+        )
+        fake_session.add(
+            "get",
+            f"{Endpoint.BASE_URI}{Endpoint.NOTICES}",
+            FakeResponse(json_data={"data": {"content": []}}),
+        )
+        fake_session.add(
+            "get",
+            f"{iot}{Endpoint.IOT_DEVICE_CONTROL}/S1/control",
+            FakeResponse(
+                json_data={"data": {"controlStatus": {"0001": "1", "0002": "1"}, "netStatus": True}}
+            ),
+        )
+        fake_session.add(
+            "get",
+            f"{iot}{Endpoint.IOT_AIR_HOME}/S1/home",
+            FakeResponse(json_data={"data": {"IAQ": {"dustpm25": "7"}}}),
+        )
+        fake_session.add(
+            "get",
+            f"{Endpoint.PURIFIER_HTML_BASE}/p1/product/02EUZ",
+            html_page("<p>no embedded json</p>"),
+        )
+        fake_session.add(
+            "get",
+            f"{Endpoint.SECONDARY_BASE}{Endpoint.PLACES}/p1/devices/S1/supplies",
+            FakeResponse(json_data={"data": {"suppliesList": []}}),
+        )
+        fake_session.add(
+            "post",
+            f"{PLACES_URL}/p1/devices/S1/control-status",
+            FakeResponse(json_data={"code": "S1000", "message": "OK"}),
+        )
+
+    async def test_one_refresh_serves_both_flows(self, fake_session):
+        self._add_poll_routes(fake_session)
+
+        async def slow_refresh(**_):
+            await asyncio.sleep(0.01)
+            return token_response("acc-2", "ref-2")
+
+        fake_session.add("post", REFRESH_URL, slow_refresh)
+
+        client = CowayClient("email@example.com", "password", session=fake_session)
+        client.access_token = "acc-old"
+        client.refresh_token = "ref-old"
+        client.token_expiration = datetime.now() + timedelta(seconds=10)
+        client.places = [DEFAULT_PLACE]
+        attr = DeviceAttributes(
+            device_id="S1",
+            model=None,
+            model_code=None,
+            code=None,
+            name="Bedroom",
+            product_name=None,
+            place_id="p1",
+        )
+
+        data, _ = await asyncio.wait_for(
+            asyncio.gather(
+                client.async_get_purifiers_data(),
+                client.async_set_power(attr, True),
+            ),
+            timeout=5,
+        )
+
+        assert data.purifiers["S1"].is_on is True
+        assert data.purifiers["S1"].particulate_matter_2_5 == 7
+        assert len(fake_session.requests("post", REFRESH_URL)) == 1
+        assert fake_session.requests("post", LOGIN_ACTION_URL) == []
+
+        # Every authenticated request after the refresh carried the new token.
+        authed = [
+            kwargs["headers"]["authorization"]
+            for method, url, kwargs in fake_session.calls
+            if "authorization" in kwargs.get("headers", {})
+        ]
+        assert authed and set(authed) == {"Bearer acc-2"}
