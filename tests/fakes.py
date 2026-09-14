@@ -70,7 +70,7 @@ class FakeResponse:
 class _FakeRequestContext:
     """Mimics the ``async with session.get(...) as resp`` context manager."""
 
-    def __init__(self, session: "FakeSession", method: str, url: str, kwargs: dict) -> None:
+    def __init__(self, session: FakeSession, method: str, url: str, kwargs: dict) -> None:
         self._session = session
         self._method = method
         self._url = url

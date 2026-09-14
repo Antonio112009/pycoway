@@ -3,12 +3,9 @@
 import asyncio
 import json
 import logging
-from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import datetime
-from typing import Any, TypeVar
-
-from aiohttp import ClientSession
+from typing import TYPE_CHECKING, Any
 
 from pycoway.account.maintenance import CowayMaintenanceClient
 from pycoway.constants import (
@@ -33,14 +30,17 @@ from pycoway.exceptions import (
     NoPurifiers,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from aiohttp import ClientSession
+
 LOGGER = logging.getLogger(__name__)
 
 IOT_DEVICES_CACHE_INTERVAL = 3600  # seconds — discovery fields rarely change
 
-T = TypeVar("T")
 
-
-def _unwrap_results(results: Sequence[T | BaseException], labels: Sequence[str]) -> list[T]:
+def _unwrap_results[T](results: Sequence[T | BaseException], labels: Sequence[str]) -> list[T]:
     """Return the successful results of ``gather(..., return_exceptions=True)``.
 
     The first failure is raised. Every other failure is logged first, so a

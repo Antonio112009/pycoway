@@ -4,10 +4,8 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
-from http.cookies import SimpleCookie
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from aiohttp import ClientResponse, ClientSession
 from bs4 import BeautifulSoup
 
 from pycoway.constants import (
@@ -28,6 +26,11 @@ from pycoway.exceptions import (
 )
 from pycoway.transport.http import CowayHttpClient
 
+if TYPE_CHECKING:
+    from http.cookies import SimpleCookie
+
+    from aiohttp import ClientResponse, ClientSession
+
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_TOKEN_LIFETIME = 3600  # seconds, used when the API omits expiresIn
@@ -39,7 +42,7 @@ def _token_lifetime(token_data: dict[str, Any]) -> int:
     expires_in = token_data.get("expiresIn", token_data.get("expires_in"))
     try:
         lifetime = int(expires_in)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return DEFAULT_TOKEN_LIFETIME
     return lifetime if lifetime > 0 else DEFAULT_TOKEN_LIFETIME
 

@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pycoway.constants import (
     PREFILTER_CYCLE,
@@ -12,8 +12,10 @@ from pycoway.constants import (
     ParamCode,
 )
 from pycoway.devices.data import CowayDataClient
-from pycoway.devices.models import DeviceAttributes
 from pycoway.exceptions import CowayError
+
+if TYPE_CHECKING:
+    from pycoway.devices.models import DeviceAttributes
 
 LOGGER = logging.getLogger(__name__)
 

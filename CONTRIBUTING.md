@@ -60,7 +60,7 @@ ruff format --check .
 
 ## Code Style
 
-- Python 3.11+ — use modern syntax (type unions with `|`, `StrEnum`, etc.)
+- Python 3.14+ — use modern syntax (type unions with `|`, `StrEnum`, PEP 695 generics, etc.)
 - Line length: 100 characters
 - Follow existing patterns in the codebase
 - Add tests for new functionality

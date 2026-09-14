@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Antonio112009/pycoway/actions/workflows/ci.yml/badge.svg)](https://github.com/Antonio112009/pycoway/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/pycoway?color=blue&label=pypi)](https://pypi.org/project/pycoway/)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.14%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Version](https://img.shields.io/github/v/release/Antonio112009/pycoway?display_name=tag&sort=semver&color=orange&label=version)](https://github.com/Antonio112009/pycoway/releases/latest)
 
@@ -22,7 +22,7 @@
 
 ## Requirements
 
-- Python 3.11 or newer
+- Python 3.14 or newer, the version the current Home Assistant release runs on
 - A Coway IoCare account with at least one registered purifier
 
 ## Installation

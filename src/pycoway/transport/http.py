@@ -2,9 +2,8 @@
 
 import json
 import logging
-from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self
 
 from aiohttp import ClientError, ClientResponse, ClientSession, ClientTimeout, ContentTypeError
 
@@ -22,6 +21,9 @@ from pycoway.exceptions import (
     CowayError,
     ServerMaintenance,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 LOGGER = logging.getLogger(__name__)
 
@@ -213,7 +215,7 @@ class CowayHttpClient:
 
         try:
             response = await resp.json()
-        except (ValueError, ContentTypeError):
+        except ValueError, ContentTypeError:
             return await resp.text()
 
         if resp.status != 200:

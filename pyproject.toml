@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Typed asyncio client for Coway AIRMEGA devices through IoCare"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 authors = [
     { name = "Antonio112009" },
 ]
@@ -18,29 +18,30 @@ maintainers = [
 keywords = ["coway", "iocare", "iocare api", "coway api", "airmega"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-# Runtime deps are floors, not pins: Home Assistant pins exact versions
-# (core: aiohttp; the scrape integration: beautifulsoup4), so our floors
-# must stay at or below those pins to avoid pip conflicts inside HA.
-# Latest-version compatibility is verified by CI, which installs the
-# newest releases on every run.
+# Runtime deps are floors, not pins, and they track the current Home
+# Assistant release: HA pins exact versions (core: aiohttp; the scrape
+# integration: beautifulsoup4), so a floor above its pin would make pip
+# refuse the install inside HA, while a floor at the pin keeps the newest
+# release the default everywhere else. Bump them together with the HA
+# release they follow. Latest-version compatibility is verified by CI,
+# which installs the newest releases on every run.
+#
+# Home Assistant 2026.9: Python >=3.14.2, aiohttp==3.14.3,
+# beautifulsoup4==4.13.3 (scrape).
 dependencies = [
-    "aiohttp>=3.12.0",
-    "beautifulsoup4>=4.13.0",
+    "aiohttp>=3.14.3",
+    "beautifulsoup4>=4.13.3",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.0",
-    "pytest-asyncio>=1.0",
-    "aioresponses>=0.7.9",
-    "ruff>=0.16",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.7",
 ]
 
 [project.urls]
@@ -63,7 +64,7 @@ include = ["pycoway*"]
 pycoway = ["py.typed"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py314"
 line-length = 100
 
 [tool.ruff.lint]
