@@ -2,9 +2,10 @@
 
 import json
 import logging
-from typing import Any
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, Any, Literal, Self
 
-from aiohttp import ClientResponse, ClientSession, ClientTimeout, ContentTypeError
+from aiohttp import ClientError, ClientResponse, ClientSession, ClientTimeout, ContentTypeError
 
 from pycoway.constants import (
     TIMEOUT,
@@ -16,9 +17,13 @@ from pycoway.constants import (
 )
 from pycoway.exceptions import (
     AuthError,
+    CowayConnectionError,
     CowayError,
     ServerMaintenance,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 LOGGER = logging.getLogger(__name__)
 
@@ -48,11 +53,35 @@ class CowayHttpClient:
         if self._owns_session and self._session is not None and not self._session.closed:
             await self._session.close()
 
-    async def __aenter__(self) -> "CowayHttpClient":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *args: Any) -> None:
         await self.close()
+
+    @asynccontextmanager
+    async def _request(
+        self, method: Literal["get", "post"], url: str, **kwargs: Any
+    ) -> AsyncIterator[ClientResponse]:
+        """Issue a request, translating transport failures into ``CowayConnectionError``.
+
+        Every HTTP call goes through here so callers only ever see the
+        ``CowayError`` hierarchy: connection failures, timeouts and
+        truncated payloads from aiohttp are re-raised as
+        :class:`~pycoway.exceptions.CowayConnectionError`. Failures while
+        reading the body inside the ``with`` block are covered as well.
+        """
+
+        session = self._ensure_session()
+        requester = session.get if method == "get" else session.post
+        try:
+            async with requester(url, timeout=self.timeout, **kwargs) as resp:
+                yield resp
+        except (ClientError, TimeoutError) as exc:
+            detail = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
+            raise CowayConnectionError(
+                f"Connection error during {method.upper()} {url}: {detail}"
+            ) from exc
 
     async def _post_endpoint(self, data: dict[str, str]) -> dict[str, Any]:
         """POST to the token endpoint."""
@@ -63,9 +92,7 @@ class CowayHttpClient:
             "user-agent": Header.USER_AGENT,
             "accept-language": Header.COWAY_LANGUAGE,
         }
-        async with self._ensure_session().post(
-            url, headers=headers, data=json.dumps(data), timeout=self.timeout
-        ) as resp:
+        async with self._request("post", url, headers=headers, data=json.dumps(data)) as resp:
             return await self._response(resp)
 
     async def _get_endpoint(
@@ -76,9 +103,7 @@ class CowayHttpClient:
     ) -> dict[str, Any]:
         """GET an authorized API endpoint."""
 
-        async with self._ensure_session().get(
-            endpoint, headers=headers, params=params, timeout=self.timeout
-        ) as resp:
+        async with self._request("get", endpoint, headers=headers, params=params) as resp:
             return await self._response(resp)
 
     def _build_auth_header(self, **extra: str) -> dict[str, str]:
@@ -114,9 +139,7 @@ class CowayHttpClient:
         """GET an IoT JSON API endpoint."""
 
         headers = self._construct_iot_header(trcode)
-        async with self._ensure_session().get(
-            endpoint, headers=headers, params=params, timeout=self.timeout
-        ) as resp:
+        async with self._request("get", endpoint, headers=headers, params=params) as resp:
             return await self._response(resp)
 
     async def _get_purifier_html(
@@ -147,9 +170,7 @@ class CowayHttpClient:
             "gravityUnit": "lb",
         }
         LOGGER.debug(f"Fetching purifier HTML page at {url}")
-        async with self._ensure_session().get(
-            url, headers=headers, params=params, timeout=self.timeout
-        ) as resp:
+        async with self._request("get", url, headers=headers, params=params) as resp:
             return await resp.text()
 
     @staticmethod
@@ -194,7 +215,7 @@ class CowayHttpClient:
 
         try:
             response = await resp.json()
-        except (ValueError, ContentTypeError):
+        except ValueError, ContentTypeError:
             return await resp.text()
 
         if resp.status != 200:

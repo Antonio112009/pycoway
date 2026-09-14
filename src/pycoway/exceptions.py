@@ -5,6 +5,15 @@ class CowayError(Exception):
     """Error from Coway api."""
 
 
+class CowayConnectionError(CowayError):
+    """Network-level failure while talking to the Coway API.
+
+    Wraps aiohttp connection errors, timeouts and truncated payloads so
+    callers only need to handle the ``CowayError`` hierarchy. The
+    original aiohttp exception is available as ``__cause__``.
+    """
+
+
 class AuthError(CowayError):
     """Authentication issue from Coway api."""
 

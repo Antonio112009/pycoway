@@ -3,10 +3,12 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from aiohttp import ClientConnectionError, ClientPayloadError
 
 from pycoway.constants import ErrorMessages
-from pycoway.exceptions import AuthError, CowayError, ServerMaintenance
+from pycoway.exceptions import AuthError, CowayConnectionError, CowayError, ServerMaintenance
 from pycoway.transport.http import CowayHttpClient
+from tests.fakes import FakeResponse
 
 
 def _mock_response(
@@ -160,3 +162,61 @@ class TestContextManager:
             assert not session.closed
         finally:
             await session.close()
+
+
+class TestConnectionErrors:
+    """aiohttp transport failures surface as CowayConnectionError (a CowayError)."""
+
+    URL = "https://iocare.iotsvc.coway.com/api/v1/com/places"
+
+    async def test_connection_failure_is_wrapped(self, fake_session):
+        fake_session.add("get", self.URL, ClientConnectionError("boom"))
+        client = CowayHttpClient(session=fake_session)
+
+        with pytest.raises(
+            CowayConnectionError, match=r"GET .*ClientConnectionError: boom"
+        ) as info:
+            await client._get_endpoint(self.URL, {}, None)
+
+        assert isinstance(info.value, CowayError)
+        assert isinstance(info.value.__cause__, ClientConnectionError)
+
+    async def test_timeout_is_wrapped(self, fake_session):
+        fake_session.add("post", f"{self.URL}/token", TimeoutError())
+        client = CowayHttpClient(session=fake_session)
+
+        with pytest.raises(CowayConnectionError, match="TimeoutError"):
+            async with client._request("post", f"{self.URL}/token"):
+                pass
+
+    async def test_body_read_failure_is_wrapped(self, fake_session):
+        html_url = "https://iocare2.coway.com/en/p1/product/MODEL"
+        fake_session.add(
+            "get",
+            html_url,
+            FakeResponse(content_type="text/html", read_error=ClientPayloadError("truncated")),
+        )
+        client = CowayHttpClient(session=fake_session)
+
+        with pytest.raises(CowayConnectionError, match="truncated"):
+            await client._get_purifier_html("nick", "serial", "MODEL", "p1")
+
+    async def test_api_errors_are_not_reclassified(self, fake_session):
+        fake_session.add("get", self.URL, FakeResponse(json_data={"error": {"message": "nope"}}))
+        client = CowayHttpClient(session=fake_session)
+
+        with pytest.raises(CowayError, match="nope") as info:
+            await client._get_endpoint(self.URL, {}, None)
+
+        assert type(info.value) is CowayError
+
+    async def test_request_passes_timeout_and_kwargs(self, fake_session):
+        fake_session.add("get", self.URL, FakeResponse(json_data={"data": {}}))
+        client = CowayHttpClient(session=fake_session, timeout=7)
+
+        assert await client._get_endpoint(self.URL, {"x": "y"}, {"a": "b"}) == {"data": {}}
+
+        (call,) = fake_session.requests("get", self.URL)
+        assert call["timeout"].total == 7
+        assert call["headers"] == {"x": "y"}
+        assert call["params"] == {"a": "b"}

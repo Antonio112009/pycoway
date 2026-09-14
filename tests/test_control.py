@@ -1,12 +1,17 @@
 """Tests for purifier control commands."""
 
+import json
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
+from aiohttp import ClientConnectionError
 
-from pycoway.constants import CommandCode, LightMode
+from pycoway.client import CowayClient
+from pycoway.constants import CommandCode, Endpoint, LightMode
 from pycoway.devices.control import CowayControlClient
-from pycoway.exceptions import CowayError
+from pycoway.exceptions import CowayConnectionError, CowayError
+from tests.fakes import FakeResponse
 
 
 def _mock_control_client(response) -> CowayControlClient:
@@ -61,3 +66,50 @@ class TestSetFanSpeed:
         with pytest.raises(CowayError, match="Invalid fan speed"):
             await client.async_set_fan_speed(sample_device, "5")
         client.async_control_purifier.assert_not_awaited()
+
+
+class TestControlTransport:
+    """Control commands through the real request path with a fake session."""
+
+    def _client(self, fake_session) -> CowayClient:
+        client = CowayClient("email@example.com", "password", session=fake_session)
+        client.access_token = "acc"
+        client.refresh_token = "ref"
+        client.token_expiration = datetime.now() + timedelta(hours=1)
+        return client
+
+    async def test_power_command_posts_expected_body(self, fake_session, sample_device):
+        url = f"{Endpoint.BASE_URI}{Endpoint.PLACES}/place-001/devices/ABC123/control-status"
+        fake_session.add("post", url, FakeResponse(json_data={"code": "S1000", "message": "OK"}))
+        client = self._client(fake_session)
+
+        await client.async_set_power(sample_device, True)
+
+        (call,) = fake_session.requests("post", url)
+        assert json.loads(call["data"]) == {
+            "attributes": {"0001": "1"},
+            "isMultiControl": False,
+            "refreshFlag": False,
+        }
+        assert call["headers"]["authorization"] == "Bearer acc"
+        assert call["headers"]["region"] == "NUS"
+
+    async def test_connection_failure_raises_coway_connection_error(
+        self, fake_session, sample_device
+    ):
+        url = f"{Endpoint.BASE_URI}{Endpoint.PLACES}/place-001/devices/ABC123/control-status"
+        fake_session.add("post", url, ClientConnectionError("boom"))
+        client = self._client(fake_session)
+
+        with pytest.raises(CowayConnectionError):
+            await client.async_set_power(sample_device, False)
+
+    async def test_prefilter_command_posts_cycle(self, fake_session, sample_device):
+        url = f"{Endpoint.BASE_URI}{Endpoint.PLACES}/place-001/devices/ABC123/control-param"
+        fake_session.add("post", url, FakeResponse(json_data={"header": {}}))
+        client = self._client(fake_session)
+
+        await client.async_change_prefilter_setting(sample_device, 3)
+
+        (call,) = fake_session.requests("post", url)
+        assert json.loads(call["data"])["attributes"] == {"0001": "168"}

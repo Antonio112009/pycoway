@@ -12,17 +12,17 @@ jobs:
   workflow-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Lint GitHub Actions workflows
         uses: docker://rhysd/actionlint:latest
 
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - run: pip install ruff
       - run: ruff check .
       - run: ruff format --check .
@@ -31,12 +31,26 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.13", "3.14"]
+        # Home Assistant runs on 3.14; add the next release here once it ships.
+        python-version: ["3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
       - run: pip install -e ".[dev]"
       - run: pytest
+
+  # One stable check for branch protection. Require "CI / ci-passed" instead
+  # of the per-version test jobs, so changing the Python matrix never leaves
+  # a required check that can no longer report.
+  ci-passed:
+    needs: [workflow-lint, lint, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any CI job did not succeed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: |
+          echo "::error::A CI job failed, was cancelled, or was skipped."
+          exit 1
