@@ -207,15 +207,16 @@ For the complete schema, see [`src/pycoway/devices/models.py`](src/pycoway/devic
 
 ## Exceptions
 
-All exceptions inherit from `CowayError`:
+All exceptions inherit from `CowayError`, including network failures: aiohttp connection errors, timeouts and truncated payloads are wrapped in `CowayConnectionError`, so a single `except CowayError` covers everything the client can raise.
 
 ```python
-from pycoway import AuthError, CowayError, PasswordExpired
+from pycoway import AuthError, CowayConnectionError, CowayError, PasswordExpired
 ```
 
 | Exception | Description |
 |---|---|
 | `CowayError` | Base exception for all library errors |
+| `CowayConnectionError` | Network error talking to Coway (connection, timeout, payload); the aiohttp error is `__cause__` |
 | `AuthError` | Authentication failed |
 | `PasswordExpired` | Coway requires a password change |
 | `ServerMaintenance` | Coway API is under maintenance |

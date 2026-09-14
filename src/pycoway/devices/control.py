@@ -147,9 +147,7 @@ class CowayControlClient(CowayDataClient):
             "refreshFlag": False,
         }
 
-        async with self._ensure_session().post(
-            url, headers=headers, data=json.dumps(data), timeout=self.timeout
-        ) as resp:
+        async with self._request("post", url, headers=headers, data=json.dumps(data)) as resp:
             return await self._control_command_response(resp)
 
     async def async_change_prefilter_setting(
@@ -176,9 +174,7 @@ class CowayControlClient(CowayDataClient):
             "refreshFlag": False,
         }
 
-        async with self._ensure_session().post(
-            url, headers=headers, data=json.dumps(data), timeout=self.timeout
-        ) as resp:
+        async with self._request("post", url, headers=headers, data=json.dumps(data)) as resp:
             response = await self._control_command_response(resp)
 
         LOGGER.debug(f"{device_attr.name} - Prefilter command sent. Response: {response}")
