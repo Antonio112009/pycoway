@@ -1,5 +1,6 @@
 """Tests for public client behavior and auth fallbacks."""
 
+import logging
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -7,7 +8,7 @@ from yarl import URL
 
 from pycoway.account.auth import CowayAuthClient, _token_lifetime
 from pycoway.client import CowayClient
-from pycoway.exceptions import AuthError
+from pycoway.exceptions import AuthError, CowayError
 
 
 class _MockPostContext:
@@ -56,6 +57,31 @@ class TestCowayClient:
     async def test_context_manager_yields_the_concrete_client(self):
         async with CowayClient("email@example.com", "password") as client:
             assert type(client) is CowayClient
+
+    async def test_additional_place_failures_are_logged(self, caplog):
+        client = CowayClient("email@example.com", "password")
+        client.places = [
+            {"placeId": "p1", "placeName": "Home", "deviceCnt": 1},
+            {"placeId": "p2", "placeName": "Office", "deviceCnt": 1},
+        ]
+        client._create_endpoint_header = AsyncMock(return_value={})
+
+        async def fail_per_place(place, headers, params):
+            raise CowayError(f"boom-{place['placeId']}")
+
+        client._fetch_place_devices = fail_per_place
+
+        try:
+            with (
+                caplog.at_level(logging.WARNING, logger="pycoway"),
+                pytest.raises(CowayError, match="boom-p1"),
+            ):
+                await client.async_get_purifiers()
+        finally:
+            await client.close()
+
+        assert "place p2 also failed" in caplog.text
+        assert "boom-p2" in caplog.text
 
 
 class TestGetAuthCode:

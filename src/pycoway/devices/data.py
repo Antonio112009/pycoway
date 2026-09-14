@@ -3,11 +3,12 @@
 import asyncio
 import json
 import logging
+from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import datetime
-from typing import Any
+from typing import Any, TypeVar
 
-from aiohttp import ClientError, ClientSession
+from aiohttp import ClientSession
 
 from pycoway.account.maintenance import CowayMaintenanceClient
 from pycoway.constants import (
@@ -35,6 +36,34 @@ from pycoway.exceptions import (
 LOGGER = logging.getLogger(__name__)
 
 IOT_DEVICES_CACHE_INTERVAL = 3600  # seconds — discovery fields rarely change
+
+T = TypeVar("T")
+
+
+def _unwrap_results(results: Sequence[T | BaseException], labels: Sequence[str]) -> list[T]:
+    """Return the successful results of ``gather(..., return_exceptions=True)``.
+
+    The first failure is raised. Every other failure is logged first, so a
+    second device (or place) failing for a different reason does not vanish
+    silently behind the exception that propagates.
+    """
+
+    values: list[T] = []
+    failures: list[tuple[str, BaseException]] = []
+    for label, result in zip(labels, results, strict=True):
+        if isinstance(result, BaseException):
+            failures.append((label, result))
+        else:
+            values.append(result)
+
+    if failures:
+        first_label, first_exc = failures[0]
+        for label, exc in failures[1:]:
+            LOGGER.warning(
+                "%s also failed; only the error for %s is raised: %r", label, first_label, exc
+            )
+        raise first_exc
+    return values
 
 
 class CowayDataClient(CowayMaintenanceClient):
@@ -116,20 +145,14 @@ class CowayDataClient(CowayMaintenanceClient):
                 return_exceptions=True,
             )
 
+        labels = [f"place {place.get('placeId')}" for place in places]
         purifiers: list[dict[str, Any]] = []
-        for result in results:
-            if isinstance(result, BaseException):
-                raise result
-            purifiers.extend(result)
+        for devices in _unwrap_results(results, labels):
+            purifiers.extend(devices)
         return purifiers
 
     async def async_get_purifiers_data(self) -> PurifierData:
-        """Return dataclass with all Purifier Devices.
-
-        Not safe for concurrent calls on the same client instance: it
-        temporarily disables token checking (``self.check_token``) for
-        the duration of the batch.
-        """
+        """Return dataclass with all Purifier Devices."""
 
         LOGGER.debug(f"Getting purifiers data for {self.username}")
         purifiers = await self.async_get_purifiers()
@@ -163,28 +186,23 @@ class CowayDataClient(CowayMaintenanceClient):
                 if (key not in dev or dev[key] is None) and key in iot_dev:
                     dev[key] = iot_dev[key]
 
-        # Only check the token once for the entire batch.
-        self.check_token = False
-        LOGGER.debug("self.check_token set to False for batch processing.")
+        await self.async_server_maintenance_notice()
 
-        try:
-            await self.async_server_maintenance_notice()
-
-            # All per-device fetches are independent once the token check
-            # is disabled, so build every purifier concurrently.
-            results = await asyncio.gather(
-                *(self._build_purifier_from_device(dev) for dev in purifiers),
-                return_exceptions=True,
-            )
-        finally:
-            self.check_token = True
-            LOGGER.debug("self.check_token set back to True")
+        # All per-device fetches are independent, so build every purifier
+        # concurrently. Token checks are serialised by the auth lock, so a
+        # refresh that becomes due mid-batch happens exactly once.
+        results = await asyncio.gather(
+            *(self._build_purifier_from_device(dev) for dev in purifiers),
+            return_exceptions=True,
+        )
+        labels = [
+            f"purifier {dev.get('dvcNick') or dev.get('deviceSerial') or dev.get('barcode')}"
+            for dev in purifiers
+        ]
 
         device_data: dict[str, CowayPurifier] = {}
-        for result in results:
-            if isinstance(result, BaseException):
-                raise result
-            device_data[result.device_attr.device_id] = result
+        for purifier in _unwrap_results(results, labels):
+            device_data[purifier.device_attr.device_id] = purifier
 
         all_purifiers = PurifierData(purifiers=device_data)
         if LOGGER.isEnabledFor(logging.DEBUG):
@@ -236,14 +254,15 @@ class CowayDataClient(CowayMaintenanceClient):
         """Fetch MCU version + lux from the HTML page; None on failure.
 
         These two data points are supplemental, so a failed scrape must
-        not fail the whole update.
+        not fail the whole update. Transport failures surface as
+        ``CowayConnectionError``, which is a ``CowayError``.
         """
 
         try:
             LOGGER.debug(f"Fetching HTML page for {nick}")
             html = await self._get_purifier_html(nick, serial, model_code, place_id)
             purifier_info = parse_purifier_html(html, nick)
-        except (ClientError, TimeoutError, CowayError):
+        except CowayError:
             LOGGER.exception(f"HTML supplement fetch failed for {nick}, skipping MCU/lux")
             return None
         if purifier_info is None:
@@ -255,8 +274,7 @@ class CowayDataClient(CowayMaintenanceClient):
     ) -> list[dict[str, Any]]:
         """Fetch Pre-filter and MAX2 filter states."""
 
-        if self.check_token:
-            await self._check_token()
+        await self._check_token()
 
         url = f"{Endpoint.SECONDARY_BASE}{Endpoint.PLACES}/{place_id}/devices/{serial}/supplies"
         headers = {
@@ -307,8 +325,7 @@ class CowayDataClient(CowayMaintenanceClient):
     async def async_get_iot_user_devices(self) -> list[dict[str, Any]]:
         """Fetch the IoT device list which contains ordNo, dvcBrandCd, etc."""
 
-        if self.check_token:
-            await self._check_token()
+        await self._check_token()
 
         url = f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_USER_DEVICES}"
         params = {"pageIndex": "0", "pageSize": "100"}
@@ -366,8 +383,7 @@ class CowayDataClient(CowayMaintenanceClient):
     async def async_get_iot_device_control(self, attr: DeviceAttributes) -> dict[str, Any]:
         """Fetch device control/status data via the IoT JSON API."""
 
-        if self.check_token:
-            await self._check_token()
+        await self._check_token()
 
         url = f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_DEVICE_CONTROL}/{attr.device_id}/control"
         params = self._iot_device_params(attr)
@@ -379,8 +395,7 @@ class CowayDataClient(CowayMaintenanceClient):
     async def async_get_iot_air_home(self, attr: DeviceAttributes) -> dict[str, Any]:
         """Fetch air-quality home data via the IoT JSON API."""
 
-        if self.check_token:
-            await self._check_token()
+        await self._check_token()
 
         url = f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_AIR_HOME}/{attr.device_id}/home"
         params = self._iot_device_params(attr)
@@ -392,8 +407,7 @@ class CowayDataClient(CowayMaintenanceClient):
     async def async_get_iot_device_conn(self, attr: DeviceAttributes) -> dict[str, Any]:
         """Fetch device connection status via the IoT JSON API."""
 
-        if self.check_token:
-            await self._check_token()
+        await self._check_token()
 
         url = f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_DEVICE_CONN}"
         params = self._iot_device_params(attr)
