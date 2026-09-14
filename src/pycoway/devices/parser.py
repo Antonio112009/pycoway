@@ -243,7 +243,7 @@ def _safe_int(value: Any) -> int | None:
         return None
     try:
         return int(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
 

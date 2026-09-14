@@ -6,6 +6,7 @@ from .constants import CommandCode, LightMode, SensorCode, SensorKey
 from .devices.models import CowayPurifier, DeviceAttributes, FilterInfo, PurifierData
 from .exceptions import (
     AuthError,
+    CowayConnectionError,
     CowayError,
     NoPlaces,
     NoPurifiers,
@@ -18,6 +19,7 @@ __all__ = [
     "AuthError",
     "CommandCode",
     "CowayClient",
+    "CowayConnectionError",
     "CowayError",
     "CowayPurifier",
     "DeviceAttributes",

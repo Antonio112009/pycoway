@@ -3,10 +3,9 @@
 import logging
 import re
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
-from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 
 from pycoway.account.auth import CowayAuthClient
@@ -17,6 +16,9 @@ from pycoway.constants import (
     Parameter,
 )
 from pycoway.exceptions import CowayError
+
+if TYPE_CHECKING:
+    from aiohttp import ClientSession
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,8 +49,7 @@ class CowayMaintenanceClient(CowayAuthClient):
     async def async_server_maintenance_notice(self) -> None:
         """Fetch the latest Coway server maintenance notice."""
 
-        if self.check_token:
-            await self._check_token()
+        await self._check_token()
 
         now = datetime.now()
 

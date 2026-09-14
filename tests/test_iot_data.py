@@ -1,5 +1,6 @@
 """Tests for IoT JSON API data methods and extract_iot_parsed_info parser."""
 
+import logging
 from unittest.mock import AsyncMock
 
 import pytest
@@ -350,15 +351,32 @@ class TestAsyncGetPurifiersData:
         assert data.purifiers["SER1"].is_on is True
         assert data.purifiers["SER1"].auto_mode is True
         assert data.purifiers["SER1"].network_status is True
-        # Token checking is re-enabled after the batch.
+        # The batch no longer toggles token checking; the lock serialises it.
         assert client.check_token is True
 
-    async def test_failed_device_restores_check_token(self):
+    async def test_failed_device_raises(self):
         client = self._client()
         client.async_get_iot_device_control = AsyncMock(side_effect=CowayError("boom"))
         with pytest.raises(CowayError, match="boom"):
             await client.async_get_purifiers_data()
-        assert client.check_token is True
+
+    async def test_additional_device_failures_are_logged(self, caplog):
+        client = self._client()
+
+        async def fail_per_device(attr):
+            raise CowayError(f"boom-{attr.device_id}")
+
+        client.async_get_iot_device_control = fail_per_device
+
+        with (
+            caplog.at_level(logging.WARNING, logger="pycoway"),
+            pytest.raises(CowayError, match="boom-SER1"),
+        ):
+            await client.async_get_purifiers_data()
+
+        assert "purifier Office also failed" in caplog.text
+        assert "boom-SER2" in caplog.text
+        assert "purifier Bedroom" in caplog.text  # named as the error that was raised
 
     async def test_html_failure_does_not_fail_device(self):
         client = self._client()

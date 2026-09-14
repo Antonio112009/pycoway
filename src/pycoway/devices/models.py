@@ -48,7 +48,7 @@ class FilterInfo:
 class PurifierData:
     """Dataclass for Purifier Data"""
 
-    purifiers: dict[str, "CowayPurifier"]
+    purifiers: dict[str, CowayPurifier]
 
 
 @dataclass(slots=True, kw_only=True)

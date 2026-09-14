@@ -9,6 +9,13 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from pycoway.devices.models import DeviceAttributes  # noqa: E402
+from tests.fakes import FakeSession  # noqa: E402
+
+
+@pytest.fixture
+def fake_session() -> FakeSession:
+    """A FakeSession to hand to a client via ``session=``."""
+    return FakeSession()
 
 
 @pytest.fixture

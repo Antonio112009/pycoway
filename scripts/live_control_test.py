@@ -35,7 +35,7 @@ async def _wait_for_status(client, attr, code: str, expected: int) -> float | No
         raw = control.get("controlStatus", {}).get(code)
         try:
             current = int(raw)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             current = raw
         if current == expected:
             return time.perf_counter() - start

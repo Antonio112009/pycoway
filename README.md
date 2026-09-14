@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Antonio112009/pycoway/actions/workflows/ci.yml/badge.svg)](https://github.com/Antonio112009/pycoway/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/pycoway?color=blue&label=pypi)](https://pypi.org/project/pycoway/)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.14%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Version](https://img.shields.io/github/v/release/Antonio112009/pycoway?display_name=tag&sort=semver&color=orange&label=version)](https://github.com/Antonio112009/pycoway/releases/latest)
 
@@ -22,7 +22,7 @@
 
 ## Requirements
 
-- Python 3.11 or newer
+- Python 3.14 or newer, the version the current Home Assistant release runs on
 - A Coway IoCare account with at least one registered purifier
 
 ## Installation
@@ -207,15 +207,16 @@ For the complete schema, see [`src/pycoway/devices/models.py`](src/pycoway/devic
 
 ## Exceptions
 
-All exceptions inherit from `CowayError`:
+All exceptions inherit from `CowayError`, including network failures: aiohttp connection errors, timeouts and truncated payloads are wrapped in `CowayConnectionError`, so a single `except CowayError` covers everything the client can raise.
 
 ```python
-from pycoway import AuthError, CowayError, PasswordExpired
+from pycoway import AuthError, CowayConnectionError, CowayError, PasswordExpired
 ```
 
 | Exception | Description |
 |---|---|
 | `CowayError` | Base exception for all library errors |
+| `CowayConnectionError` | Network error talking to Coway (connection, timeout, payload); the aiohttp error is `__cause__` |
 | `AuthError` | Authentication failed |
 | `PasswordExpired` | Coway requires a password change |
 | `ServerMaintenance` | Coway API is under maintenance |
