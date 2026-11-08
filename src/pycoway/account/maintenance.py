@@ -2,7 +2,7 @@
 
 import logging
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
@@ -35,6 +35,7 @@ class CowayMaintenanceClient(CowayAuthClient):
         session: ClientSession | None = None,
         timeout: int = TIMEOUT,
         skip_password_change: bool = False,
+        timezone: str | None = None,
     ) -> None:
         super().__init__(
             username=username,
@@ -42,6 +43,7 @@ class CowayMaintenanceClient(CowayAuthClient):
             session=session,
             timeout=timeout,
             skip_password_change=skip_password_change,
+            timezone=timezone,
         )
         self.server_maintenance: dict[str, Any] | None = None
         self._notices_checked_at: datetime | None = None
@@ -51,7 +53,7 @@ class CowayMaintenanceClient(CowayAuthClient):
 
         await self._check_token()
 
-        now = datetime.now()
+        now = datetime.now(UTC)
 
         # Skip the full list call if we checked recently.
         if (
@@ -80,7 +82,7 @@ class CowayMaintenanceClient(CowayAuthClient):
             "topPinnedYn": "",
         }
 
-        LOGGER.debug(f"Fetching maintenance notices from {url}")
+        LOGGER.debug("Fetching maintenance notices from %s", url)
         list_response = await self._get_endpoint(url, headers, params)
 
         if "error" in list_response:
@@ -93,8 +95,10 @@ class CowayMaintenanceClient(CowayAuthClient):
         if not notices:
             return
 
-        notice_seq = notices[0]["noticeSeq"]
-        LOGGER.debug(f"Latest notice sequence is {notice_seq}")
+        notice_seq = notices[0].get("noticeSeq")
+        if notice_seq is None:
+            raise CowayError(f"Maintenance notice without a sequence number: {notices[0]}")
+        LOGGER.debug("Latest notice sequence is %s", notice_seq)
 
         # Skip if we already have this notice cached.
         if self.server_maintenance and notice_seq == self.server_maintenance.get("sequence"):
@@ -115,12 +119,16 @@ class CowayMaintenanceClient(CowayAuthClient):
         }
         params = {"langCd": Header.ACCEPT_LANG}
 
-        LOGGER.debug(f"Fetching notice detail. URL: {url}")
+        LOGGER.debug("Fetching notice detail. URL: %s", url)
         latest_notice = await self._get_endpoint(url, headers, params)
         if "error" in latest_notice:
             raise CowayError(f"Failed to get latest maintenance notice: {latest_notice['error']}")
 
-        soup = BeautifulSoup(latest_notice["data"]["content"], "html.parser")
+        notice_data = latest_notice.get("data") or {}
+        content = notice_data.get("content")
+        if not isinstance(content, str):
+            raise CowayError(f"Maintenance notice {notice_seq} has no content.")
+        soup = BeautifulSoup(content, "html.parser")
         notice_lines: list[str] = []
         search_result: tuple[str, ...] | None = None
 
@@ -139,13 +147,13 @@ class CowayMaintenanceClient(CowayAuthClient):
                     search_result = match.groups()
 
         notice_info = "\n".join(notice_lines)
-        LOGGER.debug(f"Notice info: {notice_info}")
+        LOGGER.debug("Notice info: %s", notice_info)
 
         if search_result and len(search_result) == 4:
             fmt = "%Y-%m-%d %H:%M"
             edt_tz = ZoneInfo("America/New_York")
             self.server_maintenance = {
-                "sequence": latest_notice["data"]["noticeSeq"],
+                "sequence": notice_data.get("noticeSeq", notice_seq),
                 "start_date_time": datetime.strptime(
                     f"{search_result[0]} {search_result[1]}", fmt
                 ).replace(tzinfo=edt_tz),
@@ -156,10 +164,10 @@ class CowayMaintenanceClient(CowayAuthClient):
             }
         else:
             self.server_maintenance = {
-                "sequence": latest_notice["data"]["noticeSeq"],
+                "sequence": notice_data.get("noticeSeq", notice_seq),
                 "start_date_time": None,
                 "end_date_time": None,
                 "description": notice_info,
             }
 
-        LOGGER.debug(f"server_maintenance set to: {self.server_maintenance}")
+        LOGGER.debug("server_maintenance set to: %s", self.server_maintenance)

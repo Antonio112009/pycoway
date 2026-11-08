@@ -20,6 +20,7 @@ from pycoway.exceptions import (
     CowayConnectionError,
     CowayError,
     ServerMaintenance,
+    TokenRejected,
 )
 
 if TYPE_CHECKING:
@@ -27,15 +28,30 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger(__name__)
 
+_TOKEN_REJECTED = frozenset({ErrorMessages.BAD_TOKEN, ErrorMessages.EXPIRED_TOKEN})
+
 
 class CowayHttpClient:
     """Low-level HTTP transport for Coway API."""
 
-    def __init__(self, session: ClientSession | None = None, timeout: int = TIMEOUT) -> None:
+    def __init__(
+        self,
+        session: ClientSession | None = None,
+        timeout: int = TIMEOUT,
+        timezone: str | None = None,
+    ) -> None:
         self._session: ClientSession | None = session
         self._owns_session: bool = session is None
         self.timeout: ClientTimeout = ClientTimeout(total=timeout)
         self.access_token: str | None = None
+        # IANA name sent to Coway. When unset it is detected from the system
+        # on first use, which reads files: pass it from async code (Home
+        # Assistant has hass.config.time_zone) to keep the event loop free.
+        self.timezone: str | None = timezone
+
+    def _timezone_id(self) -> str:
+        """Return the configured timezone, detecting the system one if unset."""
+        return self.timezone or get_timezone()
 
     def _ensure_session(self) -> ClientSession:
         """Return the HTTP session, creating it lazily on first use.
@@ -153,7 +169,7 @@ class CowayHttpClient:
             "callingpage": Header.CALLING_PAGE,
             "accept": Header.ACCEPT,
             "dvcnick": nick_name or "",
-            "timezoneid": get_timezone(),
+            "timezoneid": self._timezone_id(),
             "appversion": Parameter.APP_VERSION,
             "accesstoken": self.access_token or "",
             "accept-language": Header.COWAY_LANGUAGE,
@@ -169,7 +185,7 @@ class CowayHttpClient:
             "weightUnit": "oz",
             "gravityUnit": "lb",
         }
-        LOGGER.debug(f"Fetching purifier HTML page at {url}")
+        LOGGER.debug("Fetching purifier HTML page at %s", url)
         async with self._request("get", url, headers=headers, params=params) as resp:
             return await resp.text()
 
@@ -188,8 +204,8 @@ class CowayHttpClient:
                 return {"error": error_json}
 
             message = error_json.get("message")
-            if message in (ErrorMessages.BAD_TOKEN, ErrorMessages.EXPIRED_TOKEN):
-                raise AuthError(f"Coway Auth error: Coway IoCare authentication failed; {message}")
+            if message in _TOKEN_REJECTED:
+                raise TokenRejected(f"Coway rejected the access token: {message}")
             return {"error": error_json}
 
         try:
@@ -221,6 +237,8 @@ class CowayHttpClient:
             return await resp.text()
 
         if resp.status != 200:
+            if isinstance(response, dict) and response.get("message") in _TOKEN_REJECTED:
+                raise TokenRejected(f"Coway rejected the access token: {response['message']}")
             return await resp.text()
 
         if not isinstance(response, dict):

@@ -18,6 +18,15 @@ class AuthError(CowayError):
     """Authentication issue from Coway api."""
 
 
+class TokenRejected(AuthError):
+    """Coway rejected the access token (expired or failed verification).
+
+    The client recovers from this on its own by logging in again and
+    retrying once, so callers normally never see it. It subclasses
+    ``AuthError`` for code that calls the low-level request helpers.
+    """
+
+
 class PasswordExpired(CowayError):
     """Coway API indicating password has expired."""
 

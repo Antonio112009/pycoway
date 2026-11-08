@@ -76,6 +76,14 @@ await client.login()
 
 > **Note:** This does not disable the Coway password policy — it simply submits the "change next time" option on the password-change page so login can proceed.
 
+## Timezone
+
+Coway expects the account's IANA timezone with some requests. Pass it as `timezone`; otherwise pycoway detects the system timezone on first use from `TZ`, `/etc/timezone` or `/etc/localtime`. That detection reads files, so async applications should pass the timezone instead to keep blocking I/O out of the event loop (Home Assistant has it as `hass.config.time_zone`):
+
+```python
+client = CowayClient("email@example.com", "password", timezone="Europe/London")
+```
+
 ## Device Control
 
 Every control method accepts the `device_attr` from a `CowayPurifier` instance:
@@ -217,7 +225,8 @@ from pycoway import AuthError, CowayConnectionError, CowayError, PasswordExpired
 |---|---|
 | `CowayError` | Base exception for all library errors |
 | `CowayConnectionError` | Network error talking to Coway (connection, timeout, payload); the aiohttp error is `__cause__` |
-| `AuthError` | Authentication failed |
+| `AuthError` | Authentication failed: the credentials were rejected |
+| `TokenRejected` | Subclass of `AuthError`: Coway rejected the access token. The client logs in again and retries once on its own, so you normally won't see it; if the new token is rejected too, a plain `CowayError` is raised, since the credentials work |
 | `PasswordExpired` | Coway requires a password change |
 | `ServerMaintenance` | Coway API is under maintenance |
 | `RateLimited` | Coway temporarily blocked the account |
