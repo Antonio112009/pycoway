@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -36,7 +36,7 @@ def _authed_client(session: FakeSession, *, expires_in: float) -> CowayAuthClien
     client = CowayAuthClient("email@example.com", "password", session=session)
     client.access_token = "acc-old"
     client.refresh_token = "ref-old"
-    client.token_expiration = datetime.now() + timedelta(seconds=expires_in)
+    client.token_expiration = datetime.now(UTC) + timedelta(seconds=expires_in)
     return client
 
 
@@ -54,7 +54,7 @@ class TestLoginFlow:
         assert client.country_code == "US"
         assert client.places == [DEFAULT_PLACE]
         assert client.token_expiration is not None
-        remaining = client.token_expiration - datetime.now()
+        remaining = client.token_expiration - datetime.now(UTC)
         assert timedelta(seconds=3500) < remaining <= timedelta(seconds=3600)
 
         (login_post,) = fake_session.requests("post", LOGIN_ACTION_URL)
@@ -224,7 +224,7 @@ class TestRefreshFallback:
         assert client.access_token == "acc-2"
         assert client.refresh_token == "ref-2"
         assert client.token_expiration is not None
-        assert client.token_expiration - datetime.now() > timedelta(seconds=7000)
+        assert client.token_expiration - datetime.now(UTC) > timedelta(seconds=7000)
         (refresh_post,) = fake_session.requests("post", REFRESH_URL)
         assert json.loads(refresh_post["data"]) == {"refreshToken": "ref-old"}
         assert fake_session.requests("post", LOGIN_ACTION_URL) == []
@@ -350,7 +350,7 @@ class TestPollRacingControlCommand:
         client = CowayClient("email@example.com", "password", session=fake_session)
         client.access_token = "acc-old"
         client.refresh_token = "ref-old"
-        client.token_expiration = datetime.now() + timedelta(seconds=10)
+        client.token_expiration = datetime.now(UTC) + timedelta(seconds=10)
         client.places = [DEFAULT_PLACE]
         attr = DeviceAttributes(
             device_id="S1",

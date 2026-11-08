@@ -58,7 +58,7 @@ class CowayControlClient(CowayDataClient):
         """Send a control command and validate the response."""
 
         response = await self.async_control_purifier(device_attr, command, value)
-        LOGGER.debug(f"{device_attr.name} - {command_name} command sent. Response: {response}")
+        LOGGER.debug("%s - %s command sent. Response: %s", device_attr.name, command_name, response)
         self._validate_control_response(response, command_name)
 
     async def async_set_power(self, device_attr: DeviceAttributes, is_on: bool) -> None:
@@ -136,6 +136,15 @@ class CowayControlClient(CowayDataClient):
     ) -> dict[str, Any] | str:
         """Execute an individual purifier control command."""
 
+        return await self._with_token_recovery(
+            lambda: self._post_control(device_attr, command, value)
+        )
+
+    async def _post_control(
+        self, device_attr: DeviceAttributes, command: str, value: Any
+    ) -> dict[str, Any] | str:
+        """POST one control command; see ``async_control_purifier``."""
+
         await self._check_token()
         url = (
             f"{Endpoint.BASE_URI}{Endpoint.PLACES}/"
@@ -153,9 +162,24 @@ class CowayControlClient(CowayDataClient):
             return await self._control_command_response(resp)
 
     async def async_change_prefilter_setting(
-        self, device_attr: DeviceAttributes, value: int
+        self, device_attr: DeviceAttributes, value: Literal[2, 3, 4]
     ) -> None:
         """Change pre-filter wash frequency. Value can be 2, 3, or 4."""
+
+        if value not in PREFILTER_CYCLE:
+            raise CowayError(
+                f"Invalid prefilter value '{value}'. Must be one of {list(PREFILTER_CYCLE)}."
+            )
+        response = await self._with_token_recovery(
+            lambda: self._post_prefilter(device_attr, PREFILTER_CYCLE[value])
+        )
+        LOGGER.debug("%s - Prefilter command sent. Response: %s", device_attr.name, response)
+        self._validate_control_response(response, "prefilter")
+
+    async def _post_prefilter(
+        self, device_attr: DeviceAttributes, cycle: str
+    ) -> dict[str, Any] | str:
+        """POST the pre-filter cycle; see ``async_change_prefilter_setting``."""
 
         await self._check_token()
         url = (
@@ -164,11 +188,6 @@ class CowayControlClient(CowayDataClient):
             f"{device_attr.device_id}/control-param"
         )
         headers = self._construct_control_header()
-        if value not in PREFILTER_CYCLE:
-            raise CowayError(
-                f"Invalid prefilter value '{value}'. Must be one of {list(PREFILTER_CYCLE)}."
-            )
-        cycle = PREFILTER_CYCLE[value]
         data = {
             "attributes": {ParamCode.PREFILTER: cycle},
             "deviceSerial": device_attr.device_id,
@@ -177,7 +196,4 @@ class CowayControlClient(CowayDataClient):
         }
 
         async with self._request("post", url, headers=headers, data=json.dumps(data)) as resp:
-            response = await self._control_command_response(resp)
-
-        LOGGER.debug(f"{device_attr.name} - Prefilter command sent. Response: {response}")
-        self._validate_control_response(response, "prefilter")
+            return await self._control_command_response(resp)
