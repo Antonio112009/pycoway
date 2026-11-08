@@ -40,6 +40,8 @@ TOKEN_REFRESH_MARGIN = 300  # seconds before expiry at which the token is refres
 def _token_lifetime(token_data: dict[str, Any]) -> int:
     """Extract the token lifetime in seconds, falling back to the default."""
     expires_in = token_data.get("expiresIn", token_data.get("expires_in"))
+    if expires_in is None:
+        return DEFAULT_TOKEN_LIFETIME
     try:
         lifetime = int(expires_in)
     except TypeError, ValueError:
@@ -109,31 +111,36 @@ class CowayAuthClient(CowayHttpClient):
         cookies: SimpleCookie,
         headers: dict[str, Any],
         data: dict[str, Any],
-    ) -> tuple[str | ClientResponse, bool]:
-        """POST credentials / password-skip to the authentication endpoint."""
+    ) -> ClientResponse | str:
+        """POST credentials / password-skip to the authentication endpoint.
+
+        Returns the response, or the form URL to post to next when Coway asks
+        for a password change and ``skip_password_change`` is set.
+        """
 
         async with self._request("post", url, cookies=cookies, headers=headers, data=data) as resp:
             if resp.content_type != "text/html":
-                return resp, False
+                return resp
 
             html_page = await resp.text()
             soup = BeautifulSoup(html_page, "html.parser")
             title_tag = soup.find("title")
 
             if title_tag is None or title_tag.string is None:
-                return resp, False
+                return resp
 
             page_title = title_tag.string
 
             if page_title == "Coway - Password change message":
                 if self.skip_password_change:
                     form = soup.find("form", id="kc-password-change-form")
-                    if form is None or not form.get("action"):
+                    action = form.get("action") if form is not None else None
+                    if not isinstance(action, str) or not action:
                         raise CowayError(
                             "Coway servers returned the password change page but no "
                             "'kc-password-change-form' form was found to skip it."
                         )
-                    return form.get("action"), True
+                    return action
                 raise PasswordExpired(
                     "Coway servers are requesting a password change as the "
                     "password on this account hasn't been changed for 60 days or more."
@@ -142,7 +149,7 @@ class CowayAuthClient(CowayHttpClient):
             error_message = soup.find("p", class_="member_error_msg")
             if error_message and error_message.text == "Your ID or password is incorrect.":
                 raise AuthError("Coway API authentication error: Invalid username/password.")
-            return resp, False
+            return resp
 
     async def _create_endpoint_header(self) -> dict[str, str]:
         """Build the common header for authorized endpoints."""
@@ -171,7 +178,7 @@ class CowayAuthClient(CowayHttpClient):
         self.country_code = await self._get_country_code()
         self.places = await self._get_places()
 
-    async def _get_login_cookies(self) -> tuple[str, Any]:
+    async def _get_login_cookies(self) -> tuple[str, SimpleCookie]:
         """Get the openid-connect login URL and associated cookies."""
 
         LOGGER.debug(f"Getting Coway login cookies for {self.username}")
@@ -191,16 +198,14 @@ class CowayAuthClient(CowayHttpClient):
 
         cookies = response.cookies
         soup = BeautifulSoup(html_page, "html.parser")
-        try:
-            login_url = soup.find("form", id="kc-form-login").get("action")
-            LOGGER.debug(f"Login URL obtained: {login_url}")
-        except AttributeError:
-            raise CowayError(
-                "Coway API error: Coway servers did not return a valid Login URL."
-            ) from None
+        form = soup.find("form", id="kc-form-login")
+        login_url = form.get("action") if form is not None else None
+        if not isinstance(login_url, str) or not login_url:
+            raise CowayError("Coway API error: Coway servers did not return a valid Login URL.")
+        LOGGER.debug(f"Login URL obtained: {login_url}")
         return login_url, cookies
 
-    async def _get_auth_code(self, login_url: str, cookies: Any) -> str:
+    async def _get_auth_code(self, login_url: str, cookies: SimpleCookie) -> str:
         """Exchange credentials for an OAuth auth code."""
 
         headers = {
@@ -224,14 +229,16 @@ class CowayAuthClient(CowayHttpClient):
         }
 
         LOGGER.debug(f"Obtaining auth code for {self.username}")
-        response, password_skip_init = await self._post_auth(login_url, cookies, headers, data)
+        response = await self._post_auth(login_url, cookies, headers, data)
         LOGGER.debug(f"Auth code response: {response}")
 
-        if password_skip_init:
-            response, password_skip_init = await self._post_auth(
-                response, cookies, headers, password_skip_data
-            )
+        if isinstance(response, str):
+            response = await self._post_auth(response, cookies, headers, password_skip_data)
             LOGGER.debug(f"Auth code skip password response: {response}")
+            if isinstance(response, str):
+                raise CowayError(
+                    "Coway servers kept returning the password change page after it was skipped."
+                )
 
         code = response.url.query.get("code")
         if not code:
@@ -388,7 +395,7 @@ class CowayAuthClient(CowayHttpClient):
             member_info = response["data"].get("memberInfo", {})
             country_code = member_info.get("countryCode")
             if country_code is not None:
-                return country_code
+                return str(country_code)
             raise CowayError(
                 f"Failed to get country code for {self.username}. Response: {response}"
             )
@@ -422,7 +429,7 @@ class CowayAuthClient(CowayHttpClient):
             raise CowayError(f"Failed to get places associated with account. {response['error']}")
 
         places = response.get("data", {}).get("content")
-        if places is not None:
+        if isinstance(places, list):
             return places
 
         raise NoPlaces(f"No places found associated with {self.username}. Response: {response}")

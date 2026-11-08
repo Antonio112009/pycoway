@@ -105,6 +105,12 @@ class TestResponse:
         with pytest.raises(CowayError, match="Could not return json"):
             await CowayHttpClient._response(resp)
 
+    async def test_200_non_dict_json_raises(self):
+        resp = _mock_response()
+        resp.json = AsyncMock(return_value=["not", "a", "dict"])
+        with pytest.raises(CowayError, match="unexpected JSON"):
+            await CowayHttpClient._response(resp)
+
 
 class TestControlCommandResponse:
     async def test_success(self):
@@ -133,6 +139,12 @@ class TestControlCommandResponse:
         )
         result = await CowayHttpClient._control_command_response(resp)
         assert result == "raw text"
+
+    async def test_non_dict_json_returns_text(self):
+        resp = _mock_response(text_data="[1, 2]")
+        resp.json = AsyncMock(return_value=[1, 2])
+        result = await CowayHttpClient._control_command_response(resp)
+        assert result == "[1, 2]"
 
 
 class TestContextManager:
@@ -200,6 +212,16 @@ class TestConnectionErrors:
 
         with pytest.raises(CowayConnectionError, match="truncated"):
             await client._get_purifier_html("nick", "serial", "MODEL", "p1")
+
+    async def test_purifier_html_without_nickname_sends_empty_header(self, fake_session):
+        html_url = "https://iocare2.coway.com/en/p1/product/MODEL"
+        fake_session.add("get", html_url, FakeResponse(content_type="text/html", text="<html/>"))
+        client = CowayHttpClient(session=fake_session)
+
+        assert await client._get_purifier_html(None, "serial", "MODEL", "p1") == "<html/>"
+
+        (call,) = fake_session.requests("get", html_url)
+        assert call["headers"]["dvcnick"] == ""
 
     async def test_api_errors_are_not_reclassified(self, fake_session):
         fake_session.add("get", self.URL, FakeResponse(json_data={"error": {"message": "nope"}}))

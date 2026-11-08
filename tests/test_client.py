@@ -89,7 +89,7 @@ class TestGetAuthCode:
         client = CowayAuthClient("email@example.com", "password", session=_MockSession())
         resp = MagicMock()
         resp.url = URL(url)
-        client._post_auth = AsyncMock(return_value=(resp, False))
+        client._post_auth = AsyncMock(return_value=resp)
         return client
 
     async def test_extracts_code_from_query(self):
@@ -103,6 +103,20 @@ class TestGetAuthCode:
             "https://example.com/redirect?state=xyz&code=auth-code-123&session_state=abc"
         )
         assert await client._get_auth_code("https://login", {}) == "auth-code-123"
+
+    async def test_password_change_page_is_skipped(self):
+        client = self._client_with_redirect("https://example.com/redirect?code=after-skip")
+        resp = client._post_auth.return_value
+        client._post_auth = AsyncMock(side_effect=["https://skip-form", resp])
+
+        assert await client._get_auth_code("https://login", {}) == "after-skip"
+        assert client._post_auth.await_args_list[1].args[0] == "https://skip-form"
+
+    async def test_password_change_page_twice_raises(self):
+        client = CowayAuthClient("email@example.com", "password", session=_MockSession())
+        client._post_auth = AsyncMock(return_value="https://skip-form")
+        with pytest.raises(CowayError, match="password change page"):
+            await client._get_auth_code("https://login", {})
 
     async def test_missing_code_raises(self):
         client = self._client_with_redirect("https://example.com/login?session_code=not-it")
@@ -122,6 +136,7 @@ class TestTokenLifetime:
 
     def test_missing_defaults(self):
         assert _token_lifetime({}) == 3600
+        assert _token_lifetime({"expiresIn": None}) == 3600
 
     def test_invalid_defaults(self):
         assert _token_lifetime({"expiresIn": "soon"}) == 3600

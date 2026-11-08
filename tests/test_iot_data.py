@@ -383,3 +383,20 @@ class TestAsyncGetPurifiersData:
         data = await client.async_get_purifiers_data()
         assert data.purifiers["SER1"].mcu_version is None
         assert data.purifiers["SER1"].lux_sensor is None
+
+    async def test_device_without_serial_or_barcode_raises(self):
+        client = self._client()
+        client.async_get_purifiers = AsyncMock(return_value=[{"dvcNick": "Ghost"}])
+        with pytest.raises(CowayError, match="Ghost has neither a serial number nor a barcode"):
+            await client.async_get_purifiers_data()
+
+    async def test_device_without_nickname_is_built(self):
+        client = self._client()
+        client.async_get_purifiers = AsyncMock(
+            return_value=[{"deviceSerial": "SER1", "placeId": "p1"}]
+        )
+        data = await client.async_get_purifiers_data()
+
+        assert set(data.purifiers) == {"SER1"}
+        client._get_purifier_html.assert_awaited_once_with(None, "SER1", "", "p1")
+        client.async_fetch_filter_status.assert_awaited_once_with("p1", "SER1", "SER1")
