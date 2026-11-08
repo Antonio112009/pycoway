@@ -13,6 +13,7 @@ from .exceptions import (
     PasswordExpired,
     RateLimited,
     ServerMaintenance,
+    TokenRejected,
 )
 
 __all__ = [
@@ -33,5 +34,6 @@ __all__ = [
     "SensorCode",
     "SensorKey",
     "ServerMaintenance",
+    "TokenRejected",
     "__version__",
 ]

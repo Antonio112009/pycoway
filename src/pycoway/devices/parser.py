@@ -57,7 +57,7 @@ def parse_purifier_html(html: str, nick_name: str) -> dict[str, Any] | None:
 
     if "children" not in purifier_json:
         LOGGER.debug(
-            f"No children key found for purifier {nick_name}. Setting purifier info to None."
+            "No children key found for purifier %s. Setting purifier info to None.", nick_name
         )
         return None
 
@@ -169,7 +169,7 @@ def build_purifier(
 
     network_status = parsed_info["network_info"].get("wifiConnected")
     if not network_status and network_status is not None:
-        LOGGER.debug(f"{device_attr.name} Purifier is not connected to WiFi.")
+        LOGGER.debug("%s Purifier is not connected to WiFi.", device_attr.name)
 
     # Filter percentages
     if filters:

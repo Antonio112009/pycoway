@@ -3,7 +3,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from bs4 import BeautifulSoup
@@ -14,7 +14,6 @@ from pycoway.constants import (
     ErrorMessages,
     Header,
     Parameter,
-    get_timezone,
 )
 from pycoway.exceptions import (
     AuthError,
@@ -23,10 +22,12 @@ from pycoway.exceptions import (
     PasswordExpired,
     RateLimited,
     ServerMaintenance,
+    TokenRejected,
 )
 from pycoway.transport.http import CowayHttpClient
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
     from http.cookies import SimpleCookie
 
     from aiohttp import ClientResponse, ClientSession
@@ -59,8 +60,9 @@ class CowayAuthClient(CowayHttpClient):
         session: ClientSession | None = None,
         timeout: int = TIMEOUT,
         skip_password_change: bool = False,
+        timezone: str | None = None,
     ) -> None:
-        super().__init__(session=session, timeout=timeout)
+        super().__init__(session=session, timeout=timeout, timezone=timezone)
         self.username: str = username
         self.password: str = password
         self.skip_password_change: bool = skip_password_change
@@ -100,7 +102,7 @@ class CowayAuthClient(CowayHttpClient):
         # when the caller passed in a shared ClientSession.
         for domain in ("id.coway.com", "iocare.iotsvc.coway.com", "iocareapi.iot.coway.com"):
             session.cookie_jar.clear_domain(domain)
-        LOGGER.debug(f"Sending request to endpoint {url}")
+        LOGGER.debug("Sending request to endpoint %s", url)
         async with self._request("get", url, headers=headers, params=params) as resp:
             html_page = await resp.text()
             return resp, html_page
@@ -173,17 +175,17 @@ class CowayAuthClient(CowayHttpClient):
         login_url, cookies = await self._get_login_cookies()
         auth_code = await self._get_auth_code(login_url, cookies)
         self.access_token, self.refresh_token, lifetime = await self._get_token(auth_code)
-        self.token_expiration = datetime.now() + timedelta(seconds=lifetime)
-        LOGGER.debug(f"Token expiration set to {self.token_expiration}.")
+        self.token_expiration = datetime.now(UTC) + timedelta(seconds=lifetime)
+        LOGGER.debug("Token expiration set to %s.", self.token_expiration)
         self.country_code = await self._get_country_code()
         self.places = await self._get_places()
 
     async def _get_login_cookies(self) -> tuple[str, SimpleCookie]:
         """Get the openid-connect login URL and associated cookies."""
 
-        LOGGER.debug(f"Getting Coway login cookies for {self.username}")
+        LOGGER.debug("Getting Coway login cookies")
         response, html_page = await self._get_oauth_page(Endpoint.OAUTH_URL)
-        LOGGER.debug(f"Login cookies response: {response}")
+        LOGGER.debug("Login cookies response: %s", response)
 
         status = response.status
         if status != 200:
@@ -202,7 +204,7 @@ class CowayAuthClient(CowayHttpClient):
         login_url = form.get("action") if form is not None else None
         if not isinstance(login_url, str) or not login_url:
             raise CowayError("Coway API error: Coway servers did not return a valid Login URL.")
-        LOGGER.debug(f"Login URL obtained: {login_url}")
+        LOGGER.debug("Login URL obtained: %s", login_url)
         return login_url, cookies
 
     async def _get_auth_code(self, login_url: str, cookies: SimpleCookie) -> str:
@@ -228,13 +230,13 @@ class CowayAuthClient(CowayHttpClient):
             "new_password_confirm": "",
         }
 
-        LOGGER.debug(f"Obtaining auth code for {self.username}")
+        LOGGER.debug("Obtaining auth code")
         response = await self._post_auth(login_url, cookies, headers, data)
-        LOGGER.debug(f"Auth code response: {response}")
+        LOGGER.debug("Auth code response: %s", response)
 
         if isinstance(response, str):
             response = await self._post_auth(response, cookies, headers, password_skip_data)
-            LOGGER.debug(f"Auth code skip password response: {response}")
+            LOGGER.debug("Auth code skip password response: %s", response)
             if isinstance(response, str):
                 raise CowayError(
                     "Coway servers kept returning the password change page after it was skipped."
@@ -256,13 +258,11 @@ class CowayAuthClient(CowayHttpClient):
             "authCode": auth_code,
             "redirectUrl": Endpoint.REDIRECT_URL,
         }
-        LOGGER.debug(f"Obtaining access/refresh token for {self.username}")
+        LOGGER.debug("Obtaining access/refresh token")
         response = await self._post_endpoint(data)
 
         if "error" in response:
-            LOGGER.debug(
-                f"Error obtaining access/refresh token for {self.username}. Response: {response}"
-            )
+            LOGGER.debug("Error obtaining access/refresh token. Response: %s", response)
             if response["error"].get("message") == ErrorMessages.INVALID_GRANT:
                 raise RateLimited(
                     "Failed fetching Coway access token. The account has likely "
@@ -280,9 +280,7 @@ class CowayAuthClient(CowayHttpClient):
         if access_token and refresh_token:
             return access_token, refresh_token, _token_lifetime(token_data)
 
-        raise CowayError(
-            f"Failed fetching Coway access/refresh token for {self.username}. Response: {response}"
-        )
+        raise CowayError(f"Failed fetching Coway access/refresh token. Response: {response}")
 
     # ------------------------------------------------------------------
     # Token management
@@ -297,11 +295,11 @@ class CowayAuthClient(CowayHttpClient):
         """
 
         if not self.check_token:
-            LOGGER.debug(f"Token check is set to False. Skipping for {self.username}")
+            LOGGER.debug("Token check is set to False. Skipping")
             return
 
         async with self._token_lock:
-            LOGGER.debug(f"Checking token for {self.username}")
+            LOGGER.debug("Checking token")
 
             if (
                 self.access_token is None
@@ -309,19 +307,44 @@ class CowayAuthClient(CowayHttpClient):
                 or self.token_expiration is None
             ):
                 LOGGER.debug(
-                    f"One of access_token, refresh_token, or token_expiration is None. "
-                    f"Logging in for {self.username}"
+                    "One of access_token, refresh_token, or token_expiration is None. Logging in"
                 )
                 await self._do_login()
                 return
 
-            remaining = (self.token_expiration - datetime.now()).total_seconds()
+            remaining = (self.token_expiration - datetime.now(UTC)).total_seconds()
             if remaining < TOKEN_REFRESH_MARGIN:
-                LOGGER.debug(
-                    f"Access token expires at {self.token_expiration}. "
-                    f"Refreshing token for {self.username}"
-                )
+                LOGGER.debug("Access token expires at %s. Refreshing token", self.token_expiration)
                 await self._refresh_token()
+
+    async def _with_token_recovery[T](self, operation: Callable[[], Awaitable[T]]) -> T:
+        """Run an authenticated operation, logging in again once if Coway rejects the token.
+
+        Coway can reject a token before its stated expiry, for example when
+        it revokes the session. That is not a credentials problem, so it
+        must not surface as ``AuthError``: a fresh login and one retry fix
+        it, and only a failing login reports bad credentials. A token that
+        is rejected again right after a successful login raises a plain
+        ``CowayError``, since the credentials evidently work.
+        """
+
+        rejected_token = self.access_token
+        try:
+            return await operation()
+        except TokenRejected as exc:
+            LOGGER.warning("Coway rejected the access token (%s); logging in again", exc)
+
+        async with self._token_lock:
+            # A concurrent caller may already have replaced the token.
+            if self.access_token == rejected_token:
+                await self._do_login()
+
+        try:
+            return await operation()
+        except TokenRejected as exc:
+            raise CowayError(
+                f"Coway rejected the access token again right after logging in: {exc}"
+            ) from exc
 
     async def _refresh_token(self) -> None:
         """Obtain a new access token using the refresh token.
@@ -339,21 +362,18 @@ class CowayAuthClient(CowayHttpClient):
         data = {"refreshToken": self.refresh_token}
         url = f"{Endpoint.BASE_URI}{Endpoint.TOKEN_REFRESH}"
 
-        LOGGER.debug(f"Refreshing tokens for {self.username} at {url}")
+        LOGGER.debug("Refreshing tokens at %s", url)
         try:
             async with self._request("post", url, headers=headers, data=json.dumps(data)) as resp:
                 response = await self._response(resp)
         except AuthError as exc:
-            LOGGER.warning(
-                f"Token refresh rejected for {self.username}, falling back to full login: {exc}"
-            )
+            LOGGER.warning("Token refresh rejected, falling back to full login: %s", exc)
             await self._do_login()
             return
 
         if "error" in response:
             LOGGER.warning(
-                f"Token refresh failed for {self.username}, falling back to full login. "
-                f"Response: {response}"
+                "Token refresh failed, falling back to full login. Response: %s", response
             )
             await self._do_login()
             return
@@ -362,12 +382,10 @@ class CowayAuthClient(CowayHttpClient):
         self.access_token = token_data.get("accessToken")
         self.refresh_token = token_data.get("refreshToken")
         if self.access_token is None or self.refresh_token is None:
-            raise CowayError(f"Failed to refresh tokens for {self.username}. Response: {response}")
+            raise CowayError(f"Failed to refresh tokens. Response: {response}")
 
-        self.token_expiration = datetime.now() + timedelta(seconds=_token_lifetime(token_data))
-        LOGGER.debug(
-            f"Tokens refreshed for {self.username}. New expiration: {self.token_expiration}"
-        )
+        self.token_expiration = datetime.now(UTC) + timedelta(seconds=_token_lifetime(token_data))
+        LOGGER.debug("Tokens refreshed. New expiration: %s", self.token_expiration)
 
     # ------------------------------------------------------------------
     # Account data
@@ -380,14 +398,13 @@ class CowayAuthClient(CowayHttpClient):
         # Part of the login flow, which runs with the token lock held and
         # a freshly issued token: build the header without a token check.
         headers = self._build_auth_header(region="NUS")
-        LOGGER.debug(f"Getting country code for {self.username}")
+        LOGGER.debug("Getting country code")
         response = await self._get_endpoint(endpoint=endpoint, headers=headers, params=None)
 
         if "data" in response:
             if LOGGER.isEnabledFor(logging.DEBUG):
                 LOGGER.debug(
-                    "Country code response for %s: %s",
-                    self.username,
+                    "Country code response: %s",
                     json.dumps(response["data"], indent=4),
                 )
             if "maintainInfos" in response["data"]:
@@ -396,18 +413,14 @@ class CowayAuthClient(CowayHttpClient):
             country_code = member_info.get("countryCode")
             if country_code is not None:
                 return str(country_code)
-            raise CowayError(
-                f"Failed to get country code for {self.username}. Response: {response}"
-            )
+            raise CowayError(f"Failed to get country code. Response: {response}")
 
         if "error" in response:
             raise CowayError(
                 f"Failed to get country code associated with account. {response['error']}"
             )
 
-        raise CowayError(
-            f"Unexpected response getting country code for {self.username}. Response: {response}"
-        )
+        raise CowayError(f"Unexpected response getting country code. Response: {response}")
 
     async def _get_places(self) -> list[dict[str, Any]]:
         """Fetch all places (homes) associated with the account."""
@@ -418,11 +431,11 @@ class CowayAuthClient(CowayHttpClient):
             "langCd": Header.ACCEPT_LANG,
             "pageIndex": "1",
             "pageSize": "20",
-            "timezoneId": get_timezone(),
+            "timezoneId": self._timezone_id(),
         }
         # Same as _get_country_code: called from the login flow, no token check.
         headers = self._build_auth_header(region="NUS")
-        LOGGER.debug(f"Getting places for {self.username}")
+        LOGGER.debug("Getting places")
         response = await self._get_endpoint(endpoint=endpoint, headers=headers, params=params)
 
         if "error" in response:
@@ -432,4 +445,4 @@ class CowayAuthClient(CowayHttpClient):
         if isinstance(places, list):
             return places
 
-        raise NoPlaces(f"No places found associated with {self.username}. Response: {response}")
+        raise NoPlaces(f"No places found associated with the account. Response: {response}")

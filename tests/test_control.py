@@ -1,7 +1,7 @@
 """Tests for purifier control commands."""
 
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
@@ -75,7 +75,7 @@ class TestControlTransport:
         client = CowayClient("email@example.com", "password", session=fake_session)
         client.access_token = "acc"
         client.refresh_token = "ref"
-        client.token_expiration = datetime.now() + timedelta(hours=1)
+        client.token_expiration = datetime.now(UTC) + timedelta(hours=1)
         return client
 
     async def test_power_command_posts_expected_body(self, fake_session, sample_device):

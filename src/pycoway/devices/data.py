@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from dataclasses import asdict
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from pycoway.account.maintenance import CowayMaintenanceClient
@@ -28,6 +28,7 @@ from pycoway.exceptions import (
     AuthError,
     CowayError,
     NoPurifiers,
+    ServerMaintenance,
 )
 
 if TYPE_CHECKING:
@@ -76,6 +77,7 @@ class CowayDataClient(CowayMaintenanceClient):
         session: ClientSession | None = None,
         timeout: int = TIMEOUT,
         skip_password_change: bool = False,
+        timezone: str | None = None,
     ) -> None:
         super().__init__(
             username=username,
@@ -83,6 +85,7 @@ class CowayDataClient(CowayMaintenanceClient):
             session=session,
             timeout=timeout,
             skip_password_change=skip_password_change,
+            timezone=timezone,
         )
         self._iot_devices_by_barcode: dict[str, dict[str, Any]] | None = None
         self._iot_devices_cached_at: datetime | None = None
@@ -93,7 +96,7 @@ class CowayDataClient(CowayMaintenanceClient):
         """Fetch the purifiers registered at a single place."""
 
         url = f"{Endpoint.BASE_URI}{Endpoint.PLACES}/{place['placeId']}/devices"
-        LOGGER.debug(f"Fetching devices for {self.username}. URL: {url}")
+        LOGGER.debug("Fetching devices. URL: %s", url)
 
         response = await self._get_endpoint(url, headers, params)
         if "error" in response:
@@ -105,8 +108,9 @@ class CowayDataClient(CowayMaintenanceClient):
         devices = response.get("data", {}).get("content")
         if not devices:
             LOGGER.debug(
-                f"No devices at Place ID: {place.get('placeId')}, "
-                f"Place Name: {place.get('placeName')}"
+                "No devices at Place ID: %s, Place Name: %s",
+                place.get("placeId"),
+                place.get("placeName"),
             )
             return []
         return [d for d in devices if d.get("categoryName") == CATEGORY_NAME]
@@ -115,7 +119,7 @@ class CowayDataClient(CowayMaintenanceClient):
         """Get all purifiers linked to Coway account."""
 
         if not self.places:
-            LOGGER.debug(f"No places loaded. Doing initial login for {self.username}")
+            LOGGER.debug("No places loaded. Doing initial login")
             await self.login()
 
         params = {"pageIndex": "0", "pageSize": "100"}
@@ -124,10 +128,10 @@ class CowayDataClient(CowayMaintenanceClient):
         places = []
         for place in self.places or []:
             LOGGER.debug(
-                f"Checking place for {self.username}. "
-                f"Place ID: {place.get('placeId')}, "
-                f"Place Name: {place.get('placeName')}, "
-                f"Device Count: {place.get('deviceCnt')}"
+                "Checking place. Place ID: %s, Place Name: %s, Device Count: %s",
+                place.get("placeId"),
+                place.get("placeName"),
+                place.get("deviceCnt"),
             )
             if place.get("deviceCnt"):
                 places.append(place)
@@ -154,15 +158,18 @@ class CowayDataClient(CowayMaintenanceClient):
     async def async_get_purifiers_data(self) -> PurifierData:
         """Return dataclass with all Purifier Devices."""
 
-        LOGGER.debug(f"Getting purifiers data for {self.username}")
+        return await self._with_token_recovery(self._get_purifiers_data)
+
+    async def _get_purifiers_data(self) -> PurifierData:
+        """Fetch every purifier; see ``async_get_purifiers_data``."""
+
+        LOGGER.debug("Getting purifiers data")
         purifiers = await self.async_get_purifiers()
         if LOGGER.isEnabledFor(logging.DEBUG):
-            LOGGER.debug(
-                "Purifiers found for %s: %s", self.username, json.dumps(purifiers, indent=4)
-            )
+            LOGGER.debug("Purifiers found: %s", json.dumps(purifiers, indent=4))
         if not purifiers:
             raise NoPurifiers(
-                f"No purifiers found for any IoCare+ places associated with {self.username}."
+                "No purifiers found for any IoCare+ places associated with the account."
             )
 
         # Fetch IoT device list for fields the legacy discovery doesn't return.
@@ -186,7 +193,15 @@ class CowayDataClient(CowayMaintenanceClient):
                 if (key not in dev or dev[key] is None) and key in iot_dev:
                     dev[key] = iot_dev[key]
 
-        await self.async_server_maintenance_notice()
+        # The notice is informational: a failure to fetch or parse it must
+        # not fail the purifier update. Token and maintenance errors still
+        # propagate, since every other request would hit them too.
+        try:
+            await self.async_server_maintenance_notice()
+        except AuthError, ServerMaintenance:
+            raise
+        except CowayError as exc:
+            LOGGER.warning("Could not fetch the Coway maintenance notice: %s", exc)
 
         # All per-device fetches are independent, so build every purifier
         # concurrently. Token checks are serialised by the auth lock, so a
@@ -209,8 +224,7 @@ class CowayDataClient(CowayMaintenanceClient):
         all_purifiers = PurifierData(purifiers=device_data)
         if LOGGER.isEnabledFor(logging.DEBUG):
             LOGGER.debug(
-                "Final PurifierData for %s: %s",
-                self.username,
+                "Final PurifierData: %s",
                 json.dumps(asdict(all_purifiers), indent=4),
             )
         return all_purifiers
@@ -219,7 +233,7 @@ class CowayDataClient(CowayMaintenanceClient):
         """Fetch all data sources for one device concurrently and build it."""
 
         nick = dev.get("dvcNick")
-        LOGGER.debug(f"Building CowayPurifier for {nick}")
+        LOGGER.debug("Building CowayPurifier for %s", nick)
 
         # Build a lightweight DeviceAttributes for the IoT API calls.
         attr = self._build_device_attr(dev)
@@ -246,10 +260,10 @@ class CowayDataClient(CowayMaintenanceClient):
                 parsed_info["sensor_info"][SensorCode.LUX] = supplements["lux"]
 
         parsed_info["filter_info"] = build_filter_dict(filter_info)
-        LOGGER.debug(f"{nick} filter dict: {parsed_info['filter_info']}")
+        LOGGER.debug("%s filter dict: %s", nick, parsed_info["filter_info"])
 
         purifier = build_purifier(attr, parsed_info, raw_filters=filter_info)
-        LOGGER.debug(f"Finished CowayPurifier for {nick}")
+        LOGGER.debug("Finished CowayPurifier for %s", nick)
         return purifier
 
     async def _fetch_html_supplements(
@@ -263,11 +277,11 @@ class CowayDataClient(CowayMaintenanceClient):
         """
 
         try:
-            LOGGER.debug(f"Fetching HTML page for {nick}")
+            LOGGER.debug("Fetching HTML page for %s", nick)
             html = await self._get_purifier_html(nick, serial, model_code, place_id)
             purifier_info = parse_purifier_html(html, nick or serial)
         except CowayError:
-            LOGGER.exception(f"HTML supplement fetch failed for {nick}, skipping MCU/lux")
+            LOGGER.exception("HTML supplement fetch failed for %s, skipping MCU/lux", nick)
             return None
         if purifier_info is None:
             return None
@@ -311,7 +325,7 @@ class CowayDataClient(CowayMaintenanceClient):
         next poll.
         """
 
-        now = datetime.now()
+        now = datetime.now(UTC)
         if (
             self._iot_devices_by_barcode is not None
             and self._iot_devices_cached_at is not None
@@ -336,7 +350,7 @@ class CowayDataClient(CowayMaintenanceClient):
         params = {"pageIndex": "0", "pageSize": "100"}
         response = await self._get_iot_endpoint(url, params, trcode=TrCode.USER_DEVICES)
         if "error" in response:
-            LOGGER.debug(f"IoT user-devices failed: {response['error']}")
+            LOGGER.debug("IoT user-devices failed: %s", response["error"])
             return []
         devices: list[dict[str, Any]] = response.get("data", {}).get("deviceInfos", [])
         return devices

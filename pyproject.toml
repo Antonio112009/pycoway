@@ -78,6 +78,7 @@ select = [
     "B",      # flake8-bugbear
     "SIM",    # flake8-simplify
     "TC",     # flake8-type-checking
+    "G",      # flake8-logging-format: lazy logging arguments
 ]
 
 [tool.mypy]
@@ -88,4 +89,5 @@ warn_unreachable = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
