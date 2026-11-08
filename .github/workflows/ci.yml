@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Lint GitHub Actions workflows
-        uses: docker://rhysd/actionlint:latest
+        uses: docker://rhysd/actionlint:1.7.12
 
   lint:
     runs-on: ubuntu-latest
@@ -26,6 +26,17 @@ jobs:
       - run: pip install ruff
       - run: ruff check .
       - run: ruff format --check .
+
+  # The package ships py.typed, so its annotations are part of the API.
+  typing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - run: pip install -e ".[dev]"
+      - run: mypy
 
   test:
     runs-on: ubuntu-latest
@@ -45,7 +56,7 @@ jobs:
   # of the per-version test jobs, so changing the Python matrix never leaves
   # a required check that can no longer report.
   ci-passed:
-    needs: [workflow-lint, lint, test]
+    needs: [workflow-lint, lint, typing, test]
     if: always()
     runs-on: ubuntu-latest
     steps:
