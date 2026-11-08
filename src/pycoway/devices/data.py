@@ -122,7 +122,7 @@ class CowayDataClient(CowayMaintenanceClient):
         headers = await self._create_endpoint_header()
 
         places = []
-        for place in self.places:
+        for place in self.places or []:
             LOGGER.debug(
                 f"Checking place for {self.username}. "
                 f"Place ID: {place.get('placeId')}, "
@@ -202,7 +202,9 @@ class CowayDataClient(CowayMaintenanceClient):
 
         device_data: dict[str, CowayPurifier] = {}
         for purifier in _unwrap_results(results, labels):
-            device_data[purifier.device_attr.device_id] = purifier
+            # _build_purifier_from_device rejects devices without an id.
+            if purifier.device_attr.device_id is not None:
+                device_data[purifier.device_attr.device_id] = purifier
 
         all_purifiers = PurifierData(purifiers=device_data)
         if LOGGER.isEnabledFor(logging.DEBUG):
@@ -221,6 +223,8 @@ class CowayDataClient(CowayMaintenanceClient):
 
         # Build a lightweight DeviceAttributes for the IoT API calls.
         attr = self._build_device_attr(dev)
+        if not attr.device_id:
+            raise CowayError(f"Purifier {nick} has neither a serial number nor a barcode.")
         model_code = dev.get("modelCode") or dev.get("prodType", "")
         place_id = str(dev.get("placeId", ""))
         serial = dev.get("deviceSerial") or dev.get("barcode", "")
@@ -231,7 +235,7 @@ class CowayDataClient(CowayMaintenanceClient):
             self.async_get_iot_device_control(attr),
             self.async_get_iot_air_home(attr),
             self._fetch_html_supplements(nick, serial, model_code, place_id),
-            self.async_fetch_filter_status(place_id, serial, nick),
+            self.async_fetch_filter_status(place_id, serial, nick or serial),
         )
 
         parsed_info = extract_iot_parsed_info(control_data, air_data, {})
@@ -261,7 +265,7 @@ class CowayDataClient(CowayMaintenanceClient):
         try:
             LOGGER.debug(f"Fetching HTML page for {nick}")
             html = await self._get_purifier_html(nick, serial, model_code, place_id)
-            purifier_info = parse_purifier_html(html, nick)
+            purifier_info = parse_purifier_html(html, nick or serial)
         except CowayError:
             LOGGER.exception(f"HTML supplement fetch failed for {nick}, skipping MCU/lux")
             return None
@@ -295,7 +299,8 @@ class CowayDataClient(CowayMaintenanceClient):
             raise CowayError(
                 f"Failed to get filter status for purifier {name}: {response['error']}"
             )
-        return response.get("data", {}).get("suppliesList", [])
+        supplies: list[dict[str, Any]] = response.get("data", {}).get("suppliesList", [])
+        return supplies
 
     async def _get_iot_devices_by_barcode(self) -> dict[str, dict[str, Any]]:
         """Return the IoT device list keyed by barcode, cached for an hour.
@@ -333,7 +338,8 @@ class CowayDataClient(CowayMaintenanceClient):
         if "error" in response:
             LOGGER.debug(f"IoT user-devices failed: {response['error']}")
             return []
-        return response.get("data", {}).get("deviceInfos", [])
+        devices: list[dict[str, Any]] = response.get("data", {}).get("deviceInfos", [])
+        return devices
 
     # ------------------------------------------------------------------
     # IoT JSON API methods
@@ -390,7 +396,8 @@ class CowayDataClient(CowayMaintenanceClient):
         response = await self._get_iot_endpoint(url, params, trcode=TrCode.DEVICE_CONTROL)
         if "error" in response:
             raise CowayError(f"IoT control-status failed for {attr.name}: {response['error']}")
-        return response.get("data", {})
+        data: dict[str, Any] = response.get("data", {})
+        return data
 
     async def async_get_iot_air_home(self, attr: DeviceAttributes) -> dict[str, Any]:
         """Fetch air-quality home data via the IoT JSON API."""
@@ -402,7 +409,8 @@ class CowayDataClient(CowayMaintenanceClient):
         response = await self._get_iot_endpoint(url, params, trcode=TrCode.AIR_HOME)
         if "error" in response:
             raise CowayError(f"IoT air home failed for {attr.name}: {response['error']}")
-        return response.get("data", {})
+        data: dict[str, Any] = response.get("data", {})
+        return data
 
     async def async_get_iot_device_conn(self, attr: DeviceAttributes) -> dict[str, Any]:
         """Fetch device connection status via the IoT JSON API."""
@@ -414,4 +422,5 @@ class CowayDataClient(CowayMaintenanceClient):
         response = await self._get_iot_endpoint(url, params, trcode=TrCode.DEVICE_CONN)
         if "error" in response:
             raise CowayError(f"IoT device connection failed for {attr.name}: {response['error']}")
-        return response.get("data", {})
+        data: dict[str, Any] = response.get("data", {})
+        return data

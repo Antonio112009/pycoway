@@ -143,7 +143,7 @@ class CowayHttpClient:
             return await self._response(resp)
 
     async def _get_purifier_html(
-        self, nick_name: str, serial: str, model_code: str, place_id: str
+        self, nick_name: str | None, serial: str, model_code: str, place_id: str
     ) -> str:
         """Fetch the HTML page shown in the iOS app for an individual purifier."""
 
@@ -152,7 +152,7 @@ class CowayHttpClient:
             "theme": Header.THEME,
             "callingpage": Header.CALLING_PAGE,
             "accept": Header.ACCEPT,
-            "dvcnick": nick_name,
+            "dvcnick": nick_name or "",
             "timezoneid": get_timezone(),
             "appversion": Parameter.APP_VERSION,
             "accesstoken": self.access_token or "",
@@ -196,6 +196,8 @@ class CowayHttpClient:
             response = await resp.json()
         except (ValueError, ContentTypeError) as exc:
             raise CowayError(f"Could not return json {exc}") from exc
+        if not isinstance(response, dict):
+            raise CowayError(f"Coway API returned unexpected JSON: {response!r}")
 
         if "data" in response and "maintainInfos" in response["data"]:
             raise ServerMaintenance("Coway Servers are undergoing maintenance.")
@@ -219,6 +221,9 @@ class CowayHttpClient:
             return await resp.text()
 
         if resp.status != 200:
+            return await resp.text()
+
+        if not isinstance(response, dict):
             return await resp.text()
 
         if "data" in response and "maintainInfos" in response["data"]:

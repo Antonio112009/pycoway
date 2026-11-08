@@ -28,13 +28,12 @@ def _decode_embedded_json(raw: str) -> dict[str, Any]:
         raw.replace('\\"', '"').replace("\\\\", "\\"),
         raw.replace("\\", ""),
     )
-    last_exc: json.JSONDecodeError | None = None
-    for candidate in candidates:
-        try:
-            return json.loads(candidate)
-        except json.JSONDecodeError as exc:
-            last_exc = exc
-    raise last_exc
+    for candidate in candidates[:-1]:
+        with contextlib.suppress(json.JSONDecodeError):
+            data: dict[str, Any] = json.loads(candidate)
+            return data
+    data = json.loads(candidates[-1])
+    return data
 
 
 def parse_purifier_html(html: str, nick_name: str) -> dict[str, Any] | None:
@@ -146,7 +145,7 @@ def _sensor_filter_pct(sensor_info: dict[str, Any], key: str) -> int | None:
     """Compute filter % remaining from sensor data, or None if unavailable."""
 
     if key in sensor_info:
-        return 100 - sensor_info[key]
+        return 100 - int(sensor_info[key])
     return None
 
 
